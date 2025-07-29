@@ -53,6 +53,15 @@ if ( !defined( 'ABSPATH' ) ) {
 					<label for="update_existing"><?php _e( 'Update existing products if SKU matches', 'rhd' ); ?></label>
 				</td>
 			</tr>
+			<tr>
+				<th scope="row">
+					<label for="create_bundles"><?php _e( 'Create Bundles', 'rhd' ); ?></label>
+				</th>
+				<td>
+					<input type="checkbox" id="create_bundles" name="create_bundles" value="1" />
+					<label for="create_bundles"><?php _e( 'Create bundles for product families.', 'rhd' ); ?></label>
+				</td>
+			</tr>
 		</table>
 
 		<?php submit_button( __( 'Import Products', 'rhd' ), 'primary', 'submit', false ); ?>
