@@ -122,7 +122,11 @@ class RHD_CSharp_Product_Importer {
 			'products_imported' => 0,
 			'products_updated'  => 0,
 			'errors'            => [],
+			'file_not_found'    => [], // Add file not found errors
 		];
+
+		// Create a single file handler instance to collect all file errors
+		$file_handler = new RHD_CSharp_File_Handler();
 
 		// Process the chunk
 		foreach ( $chunk_data as $row ) {
@@ -136,7 +140,7 @@ class RHD_CSharp_Product_Importer {
 			}
 
 			try {
-				$product_id = $this->import_single_product( $row, $update_existing );
+				$product_id = $this->import_single_product( $row, $update_existing, $file_handler );
 
 				if ( $product_id ) {
 					$pod = pods( 'product', $product_id );
@@ -155,13 +159,25 @@ class RHD_CSharp_Product_Importer {
 			}
 		}
 
+		// Collect file not found errors from the file handler
+		$file_errors = $file_handler->get_file_not_found_errors();
+		foreach ( $file_errors as $file_error ) {
+			$results['file_not_found'][] = sprintf(
+				__( 'File not found - Product ID: %s, SKU: %s, File: %s, Type: %s', 'rhd' ),
+				$file_error['product_id'],
+				$file_error['sku'],
+				$file_error['filename'],
+				$file_error['file_type']
+			);
+		}
+
 		return $results;
 	}
 
 	/**
 	 * Import a single product
 	 */
-	public function import_single_product( $data, $update_existing = false ) {
+	public function import_single_product( $data, $update_existing = false, $file_handler = null ) {
 		$sku   = sanitize_text_field( $data['Product ID'] ?? '' );
 		$title = sanitize_text_field( $data['Product Title'] ?? '' );
 
@@ -210,8 +226,10 @@ class RHD_CSharp_Product_Importer {
 			// Product Meta fields (Pods)
 			$this->update_meta_fields( $product_id, $data );
 
-			// Import and associate files
-			$file_handler = new RHD_CSharp_File_Handler();
+			// Import and associate files - use passed file handler or create new one
+			if ( !$file_handler ) {
+				$file_handler = new RHD_CSharp_File_Handler();
+			}
 			$file_handler->import_product_files( wc_get_product( $product_id ), $data );
 		}
 

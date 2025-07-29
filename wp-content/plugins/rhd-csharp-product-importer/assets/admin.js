@@ -68,6 +68,7 @@ jQuery(document).ready(function ($) {
 		let totalImported = 0;
 		let totalUpdated = 0;
 		let allErrors = [];
+		let allFileNotFoundErrors = [];
 
 		function processNextChunk() {
 			const remaining = totalRows - currentOffset;
@@ -75,7 +76,7 @@ jQuery(document).ready(function ($) {
 			
 			if (remaining <= 0) {
 				// All products processed, now finalize
-				finalizeImport(tempFile, createBundles, totalImported, totalUpdated, allErrors);
+				finalizeImport(tempFile, createBundles, totalImported, totalUpdated, allErrors, allFileNotFoundErrors);
 				return;
 			}
 
@@ -103,6 +104,11 @@ jQuery(document).ready(function ($) {
 						totalImported += data.results.products_imported;
 						totalUpdated += data.results.products_updated;
 						allErrors = allErrors.concat(data.results.errors);
+						
+						// Collect file not found errors
+						if (data.results.file_not_found) {
+							allFileNotFoundErrors = allFileNotFoundErrors.concat(data.results.file_not_found);
+						}
 
 						// Update progress
 						showProgress(
@@ -127,7 +133,7 @@ jQuery(document).ready(function ($) {
 		processNextChunk();
 	}
 
-	function finalizeImport(tempFile, createBundles, totalImported, totalUpdated, allErrors) {
+	function finalizeImport(tempFile, createBundles, totalImported, totalUpdated, allErrors, allFileNotFoundErrors) {
 		showProgress("Finalizing import (setting up grouped products and bundles)...", 0, 0, true);
 
 		$.ajax({
@@ -160,14 +166,55 @@ jQuery(document).ready(function ($) {
 					}
 
 					let errorSection = "";
-					if (allErrors.length > 0 || results.errors.length > 0) {
-						const combinedErrors = allErrors.concat(results.errors);
-						errorSection = `<br><br><strong>Errors encountered:</strong><ul style="margin-top: 5px;">`;
-						combinedErrors.slice(0, 10).forEach(function(error) { // Show max 10 errors
-							errorSection += `<li style="color: #d63638;">${error}</li>`;
-						});
-						if (combinedErrors.length > 10) {
-							errorSection += `<li style="color: #d63638;">... and ${combinedErrors.length - 10} more errors</li>`;
+					
+					// Combine all error types
+					const combinedErrors = allErrors.concat(results.errors);
+					const combinedFileErrors = allFileNotFoundErrors;
+					const totalErrorCount = combinedErrors.length + combinedFileErrors.length;
+					
+					if (totalErrorCount > 0) {
+						errorSection = `<br><br><strong>Issues encountered:</strong>`;
+						
+						// Add file not found summary if there are file errors
+						if (combinedFileErrors.length > 0) {
+							// Count file errors by type
+							let productCount = 0;
+							let soundCount = 0;
+							let imageCount = 0;
+							
+							combinedFileErrors.forEach(function(error) {
+								if (error.includes('Type: product')) {
+									productCount++;
+								} else if (error.includes('Type: sound')) {
+									soundCount++;
+								} else if (error.includes('Type: image')) {
+									imageCount++;
+								}
+							});
+							
+							errorSection += `<div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; margin: 10px 0; border-radius: 4px;">`;
+							errorSection += `<strong>Missing Files Summary:</strong><br>`;
+							errorSection += `${productCount} products not found | ${soundCount} sounds not found | ${imageCount} images not found<br>`;
+							errorSection += `<strong>Total not found: ${combinedFileErrors.length}</strong>`;
+							errorSection += `</div>`;
+						}
+						
+						errorSection += `<ul style="margin-top: 5px;">`;
+						
+						// Show regular errors first
+						const maxRegularErrors = Math.min(combinedErrors.length, 10);
+						for (let i = 0; i < maxRegularErrors; i++) {
+							errorSection += `<li style="color: #d63638;">${combinedErrors[i]}</li>`;
+						}
+						
+						// Show file not found errors
+						const maxFileErrors = Math.min(combinedFileErrors.length, 10 - maxRegularErrors);
+						for (let i = 0; i < maxFileErrors; i++) {
+							errorSection += `<li style="color: #d63638;">${combinedFileErrors[i]}</li>`;
+						}
+						
+						if (totalErrorCount > 10) {
+							errorSection += `<li style="color: #d63638;">... and ${totalErrorCount - 10} more issues</li>`;
 						}
 						errorSection += "</ul>";
 					}

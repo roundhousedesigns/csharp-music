@@ -5,6 +5,37 @@
 class RHD_CSharp_File_Handler {
 
 	/**
+	 * Array to collect file not found errors
+	 */
+	private $file_not_found_errors = [];
+
+	/**
+	 * Get collected file not found errors
+	 */
+	public function get_file_not_found_errors() {
+		return $this->file_not_found_errors;
+	}
+
+	/**
+	 * Clear file not found errors
+	 */
+	public function clear_file_not_found_errors() {
+		$this->file_not_found_errors = [];
+	}
+
+	/**
+	 * Add a file not found error
+	 */
+	private function add_file_not_found_error( $product_id, $sku, $filename, $file_type ) {
+		$this->file_not_found_errors[] = [
+			'product_id' => $product_id,
+			'sku'        => $sku,
+			'filename'   => $filename,
+			'file_type'  => $file_type,
+		];
+	}
+
+	/**
 	 * Import and associate product files
 	 */
 	public function import_product_files( $product, $data ) {
@@ -15,13 +46,13 @@ class RHD_CSharp_File_Handler {
 
 		// Handle product image
 		if ( !empty( $data['Image File Name'] ) ) {
-			$this->import_product_image( $product->get_id(), $data['Image File Name'] );
+			$this->import_product_image( $product->get_id(), $data['Image File Name'], $product->get_sku() );
 		}
 
 		// Handle sound files
 		$sound_files_field = 'Sound Filenames (comma-separated)\nExample: f-warmup.mp3, g-warmup.wav';
 		if ( !empty( $data[$sound_files_field] ) ) {
-			$this->import_sound_files( $product->get_id(), $data[$sound_files_field] );
+			$this->import_sound_files( $product->get_id(), $data[$sound_files_field], $product->get_sku() );
 		}
 	}
 
@@ -33,13 +64,14 @@ class RHD_CSharp_File_Handler {
 			return false;
 		}
 
-		// If the file doesn't have an extension, add .pdf
+		// If the file doesn't have an extension, assume .pdf
 		$filename = preg_match( '/\.\w{3,4}$/', $filename ) ? $filename : $filename . '.pdf';
 
 		// Find the actual file path using flexible matching
 		$source_path = $this->find_file_in_directory( WP_CONTENT_DIR . '/csharp-import/protected-files', $filename );
 
 		if ( !$source_path ) {
+			$this->add_file_not_found_error( $product->get_id(), $product->get_sku(), $filename, 'product' );
 			return false;
 		}
 
@@ -74,10 +106,13 @@ class RHD_CSharp_File_Handler {
 	/**
 	 * Import product image to Media Library and set as featured image
 	 */
-	public function import_product_image( $product_id, $filename ) {
+	public function import_product_image( $product_id, $filename, $sku = '' ) {
 		if ( empty( $filename ) ) {
 			return false;
 		}
+
+		// If the file doesn't have an extension, assume .jpg
+		$filename = preg_match( '/\.\w{3,4}$/', $filename ) ? $filename : $filename . '.jpg';
 
 		// Check if product already has a featured image set - if so, skip
 		$existing_featured_image = get_post_thumbnail_id( $product_id );
@@ -89,6 +124,7 @@ class RHD_CSharp_File_Handler {
 		$source_path = $this->find_file_in_directory( WP_CONTENT_DIR . '/csharp-import/images', $filename );
 
 		if ( !$source_path ) {
+			$this->add_file_not_found_error( $product_id, $sku, $filename, 'image' );
 			error_log( "Image file not found: {$filename}" );
 			return false;
 		}
@@ -99,7 +135,6 @@ class RHD_CSharp_File_Handler {
 		$existing_attachment = $this->get_attachment_by_filename( $sanitized_filename );
 		if ( $existing_attachment ) {
 			set_post_thumbnail( $product_id, $existing_attachment );
-			error_log( "Using existing image: {$sanitized_filename}" );
 			return $existing_attachment;
 		}
 
@@ -140,7 +175,7 @@ class RHD_CSharp_File_Handler {
 	/**
 	 * Import sound files to Media Library
 	 */
-	public function import_sound_files( $product_id, $filenames_string ) {
+	public function import_sound_files( $product_id, $filenames_string, $sku = '' ) {
 		if ( empty( $filenames_string ) ) {
 			return [];
 		}
@@ -158,6 +193,7 @@ class RHD_CSharp_File_Handler {
 			$source_path = $this->find_file_in_directory( WP_CONTENT_DIR . '/csharp-import/sounds', $filename );
 
 			if ( !$source_path ) {
+				$this->add_file_not_found_error( $product_id, $sku, $filename, 'sound' );
 				error_log( "Sound file not found: {$filename}" );
 				continue;
 			}
@@ -168,7 +204,6 @@ class RHD_CSharp_File_Handler {
 			$existing_attachment = $this->get_attachment_by_filename( $sanitized_filename );
 			if ( $existing_attachment ) {
 				$sound_file_ids[] = $existing_attachment;
-				error_log( "Using existing sound file: {$sanitized_filename}" );
 				continue;
 			}
 
@@ -190,7 +225,6 @@ class RHD_CSharp_File_Handler {
 
 				if ( !is_wp_error( $attachment_id ) ) {
 					$sound_file_ids[] = $attachment_id;
-					error_log( "Sound file imported: {$filename} -> {$unique_filename}" );
 				}
 			} else {
 				error_log( "Failed to copy sound file: {$source_path} -> {$destination_path}" );
@@ -200,10 +234,8 @@ class RHD_CSharp_File_Handler {
 		// Store sound file IDs as Pods field or meta
 		if ( !empty( $sound_file_ids ) ) {
 			$pod = pods( 'product', $product_id );
-			// TODO: add sound files to the product
+			// TODO: add sound files to the product as array of attachment IDs
 			// $pod->save( 'sound_files', $sound_file_ids );
-
-			error_log( 'Stored ' . count( $sound_file_ids ) . " sound file IDs for product {$product_id}" );
 		}
 
 		return $sound_file_ids;
