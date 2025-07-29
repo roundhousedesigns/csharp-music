@@ -46,15 +46,6 @@ if ( !defined( 'ABSPATH' ) ) {
 			</tr>
 			<tr>
 				<th scope="row">
-					<label for="create_bundles"><?php _e( 'Create Product Bundles', 'rhd' ); ?></label>
-				</th>
-				<td>
-					<input type="checkbox" id="create_bundles" name="create_bundles" value="1" checked />
-					<label for="create_bundles"><?php _e( 'Automatically create product bundles for each product family', 'rhd' ); ?></label>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row">
 					<label for="update_existing"><?php _e( 'Update Existing Products', 'rhd' ); ?></label>
 				</th>
 				<td>

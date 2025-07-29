@@ -64,7 +64,7 @@ class RHD_CSharp_Bundle_Creator {
 
 		// Import bundle featured image
 		$file_handler = new RHD_CSharp_File_Handler();
-		$file_handler->import_product_files( $bundle, $bundle_data );
+		
 
 		// Update bundled products
 		$this->add_products_to_bundle( $bundle_id, $base_sku, $family_data );
@@ -102,7 +102,7 @@ class RHD_CSharp_Bundle_Creator {
 
 		$bundle_id = $bundle->save();
 
-		// Import bundle featured image
+		// Import and associate product files
 		if ( $bundle_id ) {
 			$file_handler = new RHD_CSharp_File_Handler();
 			$file_handler->import_product_files( $bundle, $bundle_data );
@@ -328,54 +328,18 @@ class RHD_CSharp_Bundle_Creator {
 	 */
 	private function update_bundle_meta( $bundle, $base_sku, $data ) {
 
-		error_log( '*****data: ' . print_r( $data, true ) );
-
 		// TODO change this to attributes `pa_`
 		$bundle->update_meta_data( '_bundle_base_sku', $base_sku );
 
-		// Set global product attributes using the established pattern
+		// Set global product attributes using shared method
 		$attribute_config = [
 			'grade'    => $data['Grade'] ?? '',
 			'for-whom' => $data['For whom'] ?? '',
 			'byline'   => $data['Byline'] ?? '',
 		];
 
-		$existing_attributes = $bundle->get_attributes();
-
-		foreach ( $attribute_config as $attribute_name => $term_name ) {
-			if ( !empty( $term_name ) ) {
-				$taxonomy = 'pa_' . $attribute_name;
-
-				// Ensure attribute term exists, get its ID
-				$term = get_term_by( 'name', $term_name, $taxonomy );
-
-				if ( !$term ) {
-					// Create the term if it doesn't exist
-					$result = wp_insert_term( $term_name, $taxonomy );
-					if ( is_wp_error( $result ) ) {
-						continue; // skip if there's an error
-					}
-
-					$term_id = $result['term_id'];
-				} else {
-					$term_id = $term->term_id;
-				}
-
-				// Build the WC_Product_Attribute
-				$attribute = new WC_Product_Attribute();
-				$attribute->set_id( wc_attribute_taxonomy_id_by_name( $taxonomy ) );
-				$attribute->set_name( $taxonomy );
-				$attribute->set_options( [$term_id] );
-				$attribute->set_position( 0 );
-				$attribute->set_visible( true );
-				$attribute->set_variation( false );
-
-				// Add to existing attributes
-				$existing_attributes[$taxonomy] = $attribute;
-			}
-		}
-
-		$bundle->set_attributes( $existing_attributes );
+		$product_importer = new RHD_CSharp_Product_Importer();
+		$product_importer->set_wc_product_attributes( $bundle, $attribute_config );
 		$bundle->save();
 
 		// Set meta fields

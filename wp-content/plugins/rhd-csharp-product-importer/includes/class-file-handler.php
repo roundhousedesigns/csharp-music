@@ -8,8 +8,8 @@ class RHD_CSharp_File_Handler {
 	 * Import and associate product files
 	 */
 	public function import_product_files( $product, $data ) {
-		// Handle protected digital file
-		if ( !empty( $data['Product File Name'] ) ) {
+		// Handle protected digital file, as long as this isn't a bundle
+		if ( !empty( $data['Product File Name'] ) && !is_a( $product, 'WC_Product_Bundle' ) ) {
 			$this->import_protected_file( $product, $data['Product File Name'] );
 		}
 
@@ -33,28 +33,21 @@ class RHD_CSharp_File_Handler {
 			return false;
 		}
 
+		// If the file doesn't have an extension, add .pdf
+		$filename = preg_match( '/\.\w{3,4}$/', $filename ) ? $filename : $filename . '.pdf';
+
 		// Find the actual file path using flexible matching
 		$source_path = $this->find_file_in_directory( WP_CONTENT_DIR . '/csharp-import/protected-files', $filename );
 
 		if ( !$source_path ) {
-			error_log( "Protected file not found: {$filename}" );
 			return false;
 		}
-
-		$sanitized_filename = $this->sanitize_filename( $filename );
 
 		$upload_dir = wp_upload_dir();
 		$wc_uploads = $upload_dir['basedir'] . '/woocommerce_uploads';
 
-		// Create WooCommerce uploads directory if it doesn't exist
-		if ( !file_exists( $wc_uploads ) ) {
-			wp_mkdir_p( $wc_uploads );
-			// Add .htaccess protection
-			file_put_contents( $wc_uploads . '/.htaccess', "deny from all\n" );
-		}
-
-		// Create unique filename to prevent conflicts (using sanitized name)
-		$unique_filename  = wp_unique_filename( $wc_uploads, $sanitized_filename );
+		// Create unique filename to prevent conflicts
+		$unique_filename  = wp_unique_filename( $wc_uploads, $filename );
 		$destination_path = $wc_uploads . '/' . $unique_filename;
 
 		// Copy file to protected location
@@ -70,13 +63,11 @@ class RHD_CSharp_File_Handler {
 
 			$product->set_downloads( $downloads );
 			$product->set_downloadable( true );
-			$product->set_virtual( true );
+			$result = $product->save();
 
-			error_log( "Protected file imported: {$filename} -> {$unique_filename}" );
 			return true;
 		}
 
-		error_log( "Failed to copy protected file: {$source_path} -> {$destination_path}" );
 		return false;
 	}
 
@@ -102,7 +93,7 @@ class RHD_CSharp_File_Handler {
 			return false;
 		}
 
-		$sanitized_filename = $this->sanitize_filename( $filename );
+		$sanitized_filename = sanitize_file_name( $filename );
 
 		// Check if image already exists in Media Library (by sanitized filename)
 		$existing_attachment = $this->get_attachment_by_filename( $sanitized_filename );
@@ -171,7 +162,7 @@ class RHD_CSharp_File_Handler {
 				continue;
 			}
 
-			$sanitized_filename = $this->sanitize_filename( $filename );
+			$sanitized_filename = sanitize_file_name( $filename );
 
 			// Check if file already exists (by sanitized filename)
 			$existing_attachment = $this->get_attachment_by_filename( $sanitized_filename );
@@ -209,7 +200,8 @@ class RHD_CSharp_File_Handler {
 		// Store sound file IDs as Pods field or meta
 		if ( !empty( $sound_file_ids ) ) {
 			$pod = pods( 'product', $product_id );
-			$pod->save( 'sound_files', $sound_file_ids );
+			// TODO: add sound files to the product
+			// $pod->save( 'sound_files', $sound_file_ids );
 
 			error_log( 'Stored ' . count( $sound_file_ids ) . " sound file IDs for product {$product_id}" );
 		}
@@ -218,30 +210,12 @@ class RHD_CSharp_File_Handler {
 	}
 
 	/**
-	 * Sanitize filename by converting spaces to hyphens and removing unsafe characters
-	 */
-	public function sanitize_filename( $filename ) {
-		// Get file extension
-		$pathinfo  = pathinfo( $filename );
-		$name      = $pathinfo['filename'];
-		$extension = isset( $pathinfo['extension'] ) ? '.' . $pathinfo['extension'] : '';
-
-		// Convert spaces to hyphens and remove unsafe characters
-		$name = preg_replace( '/\s+/', '-', $name ); // Convert spaces to hyphens
-		$name = preg_replace( '/[^a-zA-Z0-9\-_.]/', '', $name ); // Remove unsafe characters
-		$name = preg_replace( '/-+/', '-', $name ); // Convert multiple hyphens to single
-		$name = trim( $name, '-' ); // Remove leading/trailing hyphens
-
-		return $name . $extension;
-	}
-
-	/**
 	 * Find file in directory, trying multiple filename variations
 	 */
 	public function find_file_in_directory( $directory, $filename ) {
 		$possible_filenames = [
 			$filename, // Original filename from CSV
-			$this->sanitize_filename( $filename ), // Sanitized version
+			sanitize_file_name( $filename ), // Sanitized version
 			str_replace( ' ', '-', $filename ), // Simple space-to-hyphen conversion
 			str_replace( ' ', '_', $filename ), // Space-to-underscore conversion
 			str_replace( ' ', '', $filename ), // Remove spaces entirely
@@ -292,7 +266,7 @@ class RHD_CSharp_File_Handler {
 
 		// If not found, try the sanitized version
 		if ( !$attachment_id ) {
-			$sanitized_filename = $this->sanitize_filename( $filename );
+			$sanitized_filename = sanitize_file_name( $filename );
 			$attachment_id      = $wpdb->get_var( $wpdb->prepare(
 				"SELECT post_id FROM {$wpdb->postmeta}
 				WHERE meta_key = '_wp_attached_file'

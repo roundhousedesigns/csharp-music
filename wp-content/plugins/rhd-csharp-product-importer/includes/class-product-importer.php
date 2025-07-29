@@ -61,7 +61,7 @@ class RHD_CSharp_Product_Importer {
 
 				if ( $update_existing ) {
 					$pod = pods( 'product', $product_id );
-					if ( $pod->get( 'rhd_csharp_importer' ) ) {
+					if ( $pod->field( 'rhd_csharp_importer' ) ) {
 						$results['products_updated']++;
 					} else {
 						$results['products_imported']++;
@@ -140,7 +140,7 @@ class RHD_CSharp_Product_Importer {
 
 				if ( $product_id ) {
 					$pod = pods( 'product', $product_id );
-					if ( $update_existing && $pod->get( 'rhd_csharp_importer' ) ) {
+					if ( $update_existing && $pod->field( 'rhd_csharp_importer' ) ) {
 						$results['products_updated']++;
 					} else {
 						$results['products_imported']++;
@@ -210,7 +210,7 @@ class RHD_CSharp_Product_Importer {
 			// Product Meta fields (Pods)
 			$this->update_meta_fields( $product_id, $data );
 
-			// Import and associate files (including featured image)
+			// Import and associate files
 			$file_handler = new RHD_CSharp_File_Handler();
 			$file_handler->import_product_files( wc_get_product( $product_id ), $data );
 		}
@@ -241,15 +241,12 @@ class RHD_CSharp_Product_Importer {
 	}
 
 	/**
-	 * Set product attributes
+	 * Set product attributes using WooCommerce taxonomy system
+	 *
+	 * @param WC_Product $product          The product object to set attributes on
+	 * @param array      $attribute_config Associative array of attribute_name => term_name
 	 */
-	private function set_product_attributes( $product, $data ) {
-		$attribute_config = [
-			'grade'      => $data['Grade'] ?? '',
-			'for-whom'   => $data['For whom'] ?? '',
-			'instrument' => $data['Instrumentation'] ?? '',
-		];
-
+	public function set_wc_product_attributes( $product, $attribute_config ) {
 		$existing_attributes = $product->get_attributes();
 
 		foreach ( $attribute_config as $attribute_name => $term_name ) {
@@ -286,6 +283,19 @@ class RHD_CSharp_Product_Importer {
 		}
 
 		$product->set_attributes( $existing_attributes );
+	}
+
+	/**
+	 * Set product attributes from CSV data
+	 */
+	private function set_product_attributes( $product, $data ) {
+		$attribute_config = [
+			'grade'      => $data['Grade'] ?? '',
+			'for-whom'   => $data['For whom'] ?? '',
+			'instrument' => $data['Instrumentation'] ?? '',
+		];
+
+		$this->set_wc_product_attributes( $product, $attribute_config );
 	}
 
 	/**
