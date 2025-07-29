@@ -327,11 +327,55 @@ class RHD_CSharp_Bundle_Creator {
 	 * Update bundle meta data from CSV data
 	 */
 	private function update_bundle_meta( $bundle, $base_sku, $data ) {
+
+		error_log( '*****data: ' . print_r( $data, true ) );
+
+		// TODO change this to attributes `pa_`
 		$bundle->update_meta_data( '_bundle_base_sku', $base_sku );
-		$bundle->update_meta_data( '_grade', sanitize_text_field( $data['Grade'] ?? '' ) );
-		$bundle->update_meta_data( '_for_whom', sanitize_text_field( $data['For whom'] ?? '' ) );
-		$bundle->update_meta_data( '_byline', sanitize_text_field( $data['Byline'] ?? '' ) );
-		$bundle->update_meta_data( '_created_via_import', true );
+
+		// Set global product attributes
+		$attributes = [];
+
+		if ( !empty( $data['Grade'] ) ) {
+			$attributes['pa_grade'] = [
+				'name'        => 'pa_grade',
+				'value'       => sanitize_text_field( $data['Grade'] ),
+				'is_visible'  => true,
+				'is_taxonomy' => true,
+			];
+		}
+
+		if ( !empty( $data['For whom'] ) ) {
+			$attributes['pa_for-whom'] = [
+				'name'        => 'pa_for-whom',
+				'value'       => sanitize_text_field( $data['For whom'] ),
+				'is_visible'  => true,
+				'is_taxonomy' => true,
+			];
+		}
+
+		if ( !empty( $data['Byline'] ) ) {
+			$attributes['pa_byline'] = [
+				'name'        => 'pa_byline',
+				'value'       => sanitize_text_field( $data['Byline'] ),
+				'is_visible'  => true,
+				'is_taxonomy' => true,
+			];
+		}
+
+		$bundle->set_attributes( $attributes );
+		$bundle->save();
+
+		// Set meta fields
+		$meta_fields = [
+			'original_url'        => $data['Original URL'] ?? '',
+			'soundcloud_link_1'   => $data['Soundcloud Link'] ?? '',
+			'soundcloud_link_2'   => $data['Soundcloud Link 2'] ?? '',
+			'rhd_csharp_importer' => true,
+		];
+
+		$pod = pods( 'product', $bundle->get_id() );
+		$pod->save( $meta_fields );
 	}
 
 	/**

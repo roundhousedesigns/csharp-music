@@ -59,7 +59,14 @@ class RHD_CSharp_Product_Importer {
 					$product_families[$base_sku]['products'][] = $product_id;
 				}
 
-				if ( $update_existing && get_post_meta( $product_id, '_created_via_import', true ) ) {
+				if ( $update_existing ) {
+					$pod = pods( 'product', $product_id );
+					if ( $pod->get( 'rhd_csharp_importer' ) ) {
+						$results['products_updated']++;
+					} else {
+						$results['products_imported']++;
+					}
+
 					$results['products_updated']++;
 				} else {
 					$results['products_imported']++;
@@ -132,7 +139,8 @@ class RHD_CSharp_Product_Importer {
 				$product_id = $this->import_single_product( $row, $update_existing );
 
 				if ( $product_id ) {
-					if ( $update_existing && get_post_meta( $product_id, '_created_via_import', true ) ) {
+					$pod = pods( 'product', $product_id );
+					if ( $update_existing && $pod->get( 'rhd_csharp_importer' ) ) {
 						$results['products_updated']++;
 					} else {
 						$results['products_imported']++;
@@ -197,10 +205,10 @@ class RHD_CSharp_Product_Importer {
 			return false;
 		}
 
-		// Now that we have a valid product ID, handle ACF fields and file imports
+		// Now that we have a valid product ID, handle Pods fields and file imports
 		if ( $product_id ) {
-			// Product Meta fields (ACF)
-			$this->update_acf_fields( $product_id, $data );
+			// Product Meta fields (Pods)
+			$this->update_meta_fields( $product_id, $data );
 
 			// Import and associate files (including featured image)
 			$file_handler = new RHD_CSharp_File_Handler();
@@ -281,42 +289,38 @@ class RHD_CSharp_Product_Importer {
 	}
 
 	/**
-	 * Update ACF fields from CSV data
+	 * Update Pods fields from CSV data
 	 */
-	private function update_acf_fields( $product_id, $data ) {
-		$acf_fields = [
-			'byline'            => [
-				'value'    => $data['Byline'] ?? '',
-				'sanitize' => 'sanitize_text_field',
-			],
-			'original_url'      => [
+	private function update_meta_fields( $product_id, $data ) {
+		$fields = [
+			'original_url'        => [
 				'value'    => $data['Original URL'] ?? '',
 				'sanitize' => 'esc_url_raw',
 			],
-			'soundcloud_link'   => [
+			'soundcloud_link_1'   => [
 				'value'    => $data['Soundcloud Link'] ?? '',
 				'sanitize' => 'esc_url_raw',
 			],
-			'soundcloud_link_2' => [
+			'soundcloud_link_2'   => [
 				'value'    => $data['Soundcloud Link 2'] ?? '',
 				'sanitize' => 'esc_url_raw',
 			],
-			'single_instrument' => [
-				'value'    => $data['Single Instrument'] ?? '',
-				'sanitize' => 'sanitize_text_field',
-			],
-			'created_by_import' => [
+			'rhd_csharp_importer' => [
 				'value'    => true,
 				'sanitize' => null,
 			],
 		];
 
-		foreach ( $acf_fields as $field_name => $field_config ) {
+		foreach ( $fields as $field_name => $field_config ) {
 			$value = $field_config['value'];
 			if ( $field_config['sanitize'] ) {
 				$value = call_user_func( $field_config['sanitize'], $value );
 			}
-			update_field( $field_name, $value, $product_id );
+
+			error_log( 'Updating field: ' . $field_name . ' with value: ' . $value );
+
+			$pod = pods( 'product', $product_id );
+			$pod->save( $field_name, $value );
 		}
 	}
 

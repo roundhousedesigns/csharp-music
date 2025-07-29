@@ -91,7 +91,6 @@ class RHD_CSharp_File_Handler {
 		// Check if product already has a featured image set - if so, skip
 		$existing_featured_image = get_post_thumbnail_id( $product_id );
 		if ( $existing_featured_image ) {
-			error_log( "Product {$product_id} already has featured image (ID: {$existing_featured_image}), skipping import of {$filename}" );
 			return $existing_featured_image;
 		}
 
@@ -139,7 +138,6 @@ class RHD_CSharp_File_Handler {
 				// Set as featured image
 				set_post_thumbnail( $product_id, $attachment_id );
 
-				error_log( "Image imported: {$filename} -> {$unique_filename}" );
 				return $attachment_id;
 			}
 		}
@@ -208,9 +206,11 @@ class RHD_CSharp_File_Handler {
 			}
 		}
 
-		// Store sound file IDs as ACF field or meta
+		// Store sound file IDs as Pods field or meta
 		if ( !empty( $sound_file_ids ) ) {
-			update_field( 'sound_files', $sound_file_ids, $product_id );
+			$pod = pods( 'product', $product_id );
+			$pod->save( 'sound_files', $sound_file_ids );
+
 			error_log( 'Stored ' . count( $sound_file_ids ) . " sound file IDs for product {$product_id}" );
 		}
 
@@ -250,7 +250,6 @@ class RHD_CSharp_File_Handler {
 		foreach ( $possible_filenames as $possible_filename ) {
 			$full_path = rtrim( $directory, '/' ) . '/' . $possible_filename;
 			if ( file_exists( $full_path ) ) {
-				error_log( "Found file: {$filename} as {$possible_filename}" );
 				return $full_path;
 			}
 		}
@@ -267,7 +266,6 @@ class RHD_CSharp_File_Handler {
 				foreach ( $possible_filenames as $possible_filename ) {
 					if ( strcasecmp( $file, $possible_filename ) === 0 ) {
 						$full_path = rtrim( $directory, '/' ) . '/' . $file;
-						error_log( "Found file (case-insensitive): {$filename} as {$file}" );
 						return $full_path;
 					}
 				}
