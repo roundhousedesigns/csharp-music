@@ -333,37 +333,49 @@ class RHD_CSharp_Bundle_Creator {
 		// TODO change this to attributes `pa_`
 		$bundle->update_meta_data( '_bundle_base_sku', $base_sku );
 
-		// Set global product attributes
-		$attributes = [];
+		// Set global product attributes using the established pattern
+		$attribute_config = [
+			'grade'    => $data['Grade'] ?? '',
+			'for-whom' => $data['For whom'] ?? '',
+			'byline'   => $data['Byline'] ?? '',
+		];
 
-		if ( !empty( $data['Grade'] ) ) {
-			$attributes['pa_grade'] = [
-				'name'        => 'pa_grade',
-				'value'       => sanitize_text_field( $data['Grade'] ),
-				'is_visible'  => true,
-				'is_taxonomy' => true,
-			];
+		$existing_attributes = $bundle->get_attributes();
+
+		foreach ( $attribute_config as $attribute_name => $term_name ) {
+			if ( !empty( $term_name ) ) {
+				$taxonomy = 'pa_' . $attribute_name;
+
+				// Ensure attribute term exists, get its ID
+				$term = get_term_by( 'name', $term_name, $taxonomy );
+
+				if ( !$term ) {
+					// Create the term if it doesn't exist
+					$result = wp_insert_term( $term_name, $taxonomy );
+					if ( is_wp_error( $result ) ) {
+						continue; // skip if there's an error
+					}
+
+					$term_id = $result['term_id'];
+				} else {
+					$term_id = $term->term_id;
+				}
+
+				// Build the WC_Product_Attribute
+				$attribute = new WC_Product_Attribute();
+				$attribute->set_id( wc_attribute_taxonomy_id_by_name( $taxonomy ) );
+				$attribute->set_name( $taxonomy );
+				$attribute->set_options( [$term_id] );
+				$attribute->set_position( 0 );
+				$attribute->set_visible( true );
+				$attribute->set_variation( false );
+
+				// Add to existing attributes
+				$existing_attributes[$taxonomy] = $attribute;
+			}
 		}
 
-		if ( !empty( $data['For whom'] ) ) {
-			$attributes['pa_for-whom'] = [
-				'name'        => 'pa_for-whom',
-				'value'       => sanitize_text_field( $data['For whom'] ),
-				'is_visible'  => true,
-				'is_taxonomy' => true,
-			];
-		}
-
-		if ( !empty( $data['Byline'] ) ) {
-			$attributes['pa_byline'] = [
-				'name'        => 'pa_byline',
-				'value'       => sanitize_text_field( $data['Byline'] ),
-				'is_visible'  => true,
-				'is_taxonomy' => true,
-			];
-		}
-
-		$bundle->set_attributes( $attributes );
+		$bundle->set_attributes( $existing_attributes );
 		$bundle->save();
 
 		// Set meta fields

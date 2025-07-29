@@ -311,17 +311,18 @@ class RHD_CSharp_Product_Importer {
 			],
 		];
 
+		$update_fields = [];
 		foreach ( $fields as $field_name => $field_config ) {
 			$value = $field_config['value'];
 			if ( $field_config['sanitize'] ) {
 				$value = call_user_func( $field_config['sanitize'], $value );
 			}
 
-			error_log( 'Updating field: ' . $field_name . ' with value: ' . $value );
-
-			$pod = pods( 'product', $product_id );
-			$pod->save( $field_name, $value );
+			$update_fields[$field_name] = $value;
 		}
+
+		$pod = pods( 'product', $product_id );
+		$pod->save( $update_fields );
 	}
 
 	/**

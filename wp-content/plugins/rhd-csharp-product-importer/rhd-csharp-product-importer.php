@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: RHD C. Sharp Product Importer
- * Description: Imports C. Sharp products into WooCommerce. Requires WooCommerce, WooCommerce Product Bundles, and Advanced Custom Fields.
+ * Description: Imports C. Sharp products into WooCommerce. Requires WooCommerce, WooCommerce Product Bundles, and Pods.io.
  * Version: 0.1
  * Author: Roundhouse Designs
  * Author URI: https://roundhouse-designs.com
