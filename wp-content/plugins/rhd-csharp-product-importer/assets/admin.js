@@ -43,6 +43,7 @@ jQuery(document).ready(function ($) {
 				if (response.success) {
 					const totalRows = response.data.total_rows;
 					const tempFile = response.data.temp_file;
+					const logFile = response.data.log_file; // Track log file
 					
 					if (totalRows === 0) {
 						showError("No products found in CSV file.");
@@ -50,7 +51,7 @@ jQuery(document).ready(function ($) {
 					}
 
 					// Start chunked processing - bundles are always created
-					processChunks(tempFile, totalRows, updateExisting);
+					processChunks(tempFile, totalRows, updateExisting, logFile);
 				} else {
 					showError(response.data || "Failed to analyze CSV file.");
 				}
@@ -61,7 +62,7 @@ jQuery(document).ready(function ($) {
 		});
 	});
 
-	function processChunks(tempFile, totalRows, updateExisting) {
+	function processChunks(tempFile, totalRows, updateExisting, logFile) {
 		let currentOffset = 0;
 		const chunkSize = 50; // Process 50 products at a time
 		let totalImported = 0;
@@ -75,7 +76,7 @@ jQuery(document).ready(function ($) {
 			
 			if (remaining <= 0) {
 				// All products processed, now finalize with bundle creation
-				finalizeImport(tempFile, totalImported, totalUpdated, allErrors, allFileNotFoundErrors);
+				finalizeImport(tempFile, totalImported, totalUpdated, allErrors, allFileNotFoundErrors, logFile);
 				return;
 			}
 
@@ -92,6 +93,7 @@ jQuery(document).ready(function ($) {
 					action: "rhd_process_chunk",
 					nonce: rhdImporter.nonce,
 					temp_file: tempFile,
+					log_file: logFile,
 					offset: currentOffset,
 					chunk_size: chunkSize,
 					update_existing: updateExisting ? "1" : "0"
@@ -132,7 +134,7 @@ jQuery(document).ready(function ($) {
 		processNextChunk();
 	}
 
-	function finalizeImport(tempFile, totalImported, totalUpdated, allErrors, allFileNotFoundErrors) {
+	function finalizeImport(tempFile, totalImported, totalUpdated, allErrors, allFileNotFoundErrors, logFile) {
 		showProgress("Preparing bundle creation...", 0, 0, true);
 
 		$.ajax({
@@ -141,7 +143,8 @@ jQuery(document).ready(function ($) {
 			data: {
 				action: "rhd_finalize_import",
 				nonce: rhdImporter.nonce,
-				temp_file: tempFile
+				temp_file: tempFile,
+				log_file: logFile
 			},
 			success: function(response) {
 				if (response.success) {
@@ -149,10 +152,10 @@ jQuery(document).ready(function ($) {
 					
 					if (data.total_bundles > 0) {
 						// Start chunked bundle creation
-						processBundles(data.bundle_data_file, data.total_bundles, totalImported, totalUpdated, allErrors, allFileNotFoundErrors);
+						processBundles(data.bundle_data_file, data.total_bundles, totalImported, totalUpdated, allErrors, allFileNotFoundErrors, logFile);
 					} else {
-						// No bundles to create, show final results
-						showFinalResults(totalImported, totalUpdated, 0, allErrors, allFileNotFoundErrors, []);
+						// No bundles to create, show final results with existing file errors
+						showFinalResults(totalImported, totalUpdated, 0, allErrors, allFileNotFoundErrors, [], logFile);
 					}
 				} else {
 					showError("Preparation failed: " + (response.data || "Unknown error"));
@@ -164,7 +167,7 @@ jQuery(document).ready(function ($) {
 		});
 	}
 
-	function processBundles(bundleDataFile, totalBundles, totalImported, totalUpdated, allErrors, allFileNotFoundErrors) {
+	function processBundles(bundleDataFile, totalBundles, totalImported, totalUpdated, allErrors, allFileNotFoundErrors, logFile) {
 		let currentOffset = 0;
 		const chunkSize = 5; // Process 5 bundles at a time
 		let totalBundlesCreated = 0;
@@ -177,7 +180,7 @@ jQuery(document).ready(function ($) {
 			if (remaining <= 0) {
 				// All bundles processed, show final results
 				const combinedFileErrors = allFileNotFoundErrors.concat(allBundleFileErrors);
-				showFinalResults(totalImported, totalUpdated, totalBundlesCreated, allErrors, combinedFileErrors, allBundleErrors);
+				showFinalResults(totalImported, totalUpdated, totalBundlesCreated, allErrors, combinedFileErrors, allBundleErrors, logFile);
 				return;
 			}
 
@@ -194,6 +197,7 @@ jQuery(document).ready(function ($) {
 					action: "rhd_process_bundles",
 					nonce: rhdImporter.nonce,
 					bundle_data_file: bundleDataFile,
+					log_file: logFile,
 					offset: currentOffset,
 					chunk_size: chunkSize
 				},
@@ -219,7 +223,7 @@ jQuery(document).ready(function ($) {
 						if (data.is_complete) {
 							// All bundles processed, show final results
 							const combinedFileErrors = allFileNotFoundErrors.concat(allBundleFileErrors);
-							showFinalResults(totalImported, totalUpdated, totalBundlesCreated, allErrors, combinedFileErrors, allBundleErrors);
+							showFinalResults(totalImported, totalUpdated, totalBundlesCreated, allErrors, combinedFileErrors, allBundleErrors, logFile);
 						} else {
 							// Process next chunk
 							setTimeout(processNextBundleChunk, 500); // Small delay between bundle chunks
@@ -238,7 +242,7 @@ jQuery(document).ready(function ($) {
 		processNextBundleChunk();
 	}
 
-	function showFinalResults(totalImported, totalUpdated, totalBundlesCreated, allErrors, allFileNotFoundErrors, allBundleErrors) {
+	function showFinalResults(totalImported, totalUpdated, totalBundlesCreated, allErrors, allFileNotFoundErrors, allBundleErrors, logFile) {
 		$progressDiv.hide();
 		
 		let successMessage = "Import completed successfully!<br>";
@@ -317,6 +321,16 @@ jQuery(document).ready(function ($) {
 		if (totalBundlesCreated > 0) {
 			errorSection += `<br><div style="background-color: #d1ecf1; border: 1px solid #bee5eb; padding: 10px; margin: 10px 0; border-radius: 4px;">`;
 			errorSection += `<strong>Note:</strong> Bundle ZIP files will be created automatically when customers first download them. This speeds up the import process.`;
+			errorSection += `</div>`;
+		}
+
+		// Add log file information
+		if (logFile) {
+			errorSection += `<br><div style="background-color: #e7f3ff; border: 1px solid #b3d9ff; padding: 10px; margin: 10px 0; border-radius: 4px;">`;
+			errorSection += `<strong>📋 Complete Import Log:</strong><br>`;
+			errorSection += `A detailed log with all import activities and errors has been saved to:<br>`;
+			errorSection += `<code>/wp-content/rhd-import-logs/${logFile}</code><br>`;
+			errorSection += `<small>This log contains all errors, including those not shown above due to space limitations.</small>`;
 			errorSection += `</div>`;
 		}
 

@@ -10,6 +10,225 @@ class RHD_CSharp_File_Handler {
 	private $file_not_found_errors = [];
 
 	/**
+	 * Import log file path
+	 */
+	public $log_file_path = null;
+
+	/**
+	 * Set the log file path for existing log files
+	 */
+	public function set_log_file_path( $log_file_path ) {
+		$this->log_file_path = $log_file_path;
+	}
+
+	/**
+	 * Initialize import logging
+	 */
+	public function init_import_log() {
+		$logs_dir = WP_CONTENT_DIR . '/rhd-import-logs';
+		
+		// Create logs directory if it doesn't exist
+		if ( !file_exists( $logs_dir ) ) {
+			wp_mkdir_p( $logs_dir );
+		}
+		
+		// Create log file with timestamp
+		$timestamp = date( 'Y-m-d_H-i-s' );
+		$this->log_file_path = $logs_dir . '/import-log-' . $timestamp . '.txt';
+		
+		// Write log header
+		$this->write_to_log( "=== RHD C# Import Log Started ===" );
+		$this->write_to_log( "Date: " . date( 'Y-m-d H:i:s' ) );
+		$this->write_to_log( "WordPress Version: " . get_bloginfo( 'version' ) );
+		$this->write_to_log( "Plugin Version: " . RHD_CSHARP_IMPORTER_VERSION );
+		$this->write_to_log( "=====================================\n" );
+		
+		return $this->log_file_path;
+	}
+
+	/**
+	 * Write message to import log
+	 */
+	public function write_to_log( $message, $level = 'INFO' ) {
+		if ( !$this->log_file_path ) {
+			return false;
+		}
+		
+		$timestamp = date( 'Y-m-d H:i:s' );
+		$formatted_message = "[{$timestamp}] [{$level}] {$message}\n";
+		
+		file_put_contents( $this->log_file_path, $formatted_message, FILE_APPEND | LOCK_EX );
+		return true;
+	}
+
+	/**
+	 * Log import phase start
+	 */
+	public function log_phase_start( $phase_name, $total_items = null ) {
+		$message = "=== Starting Phase: {$phase_name} ===";
+		if ( $total_items !== null ) {
+			$message .= " (Processing {$total_items} items)";
+		}
+		$this->write_to_log( $message );
+	}
+
+	/**
+	 * Log import phase completion
+	 */
+	public function log_phase_complete( $phase_name, $results = [] ) {
+		$this->write_to_log( "=== Completed Phase: {$phase_name} ===" );
+		foreach ( $results as $key => $value ) {
+			$formatted_value = $this->format_log_value( $value );
+			$this->write_to_log( "  {$key}: {$formatted_value}" );
+		}
+		$this->write_to_log( "" ); // Empty line for readability
+	}
+
+	/**
+	 * Format values for logging (handles arrays, objects, etc.)
+	 */
+	private function format_log_value( $value ) {
+		if ( is_array( $value ) ) {
+			if ( empty( $value ) ) {
+				return '[]';
+			}
+			
+			// For small arrays, show inline. For larger arrays, show formatted.
+			if ( count( $value ) <= 3 ) {
+				return '[' . implode( ', ', array_map( function( $item ) {
+					return is_string( $item ) ? '"' . $item . '"' : (string) $item;
+				}, $value ) ) . ']';
+			} else {
+				return "[\n" . implode( "\n", array_map( function( $item ) {
+					$formatted_item = is_string( $item ) ? '"' . $item . '"' : (string) $item;
+					return "    - {$formatted_item}";
+				}, $value ) ) . "\n  ]";
+			}
+		} elseif ( is_object( $value ) ) {
+			return 'Object(' . get_class( $value ) . ')';
+		} elseif ( is_bool( $value ) ) {
+			return $value ? 'true' : 'false';
+		} elseif ( is_null( $value ) ) {
+			return 'null';
+		} else {
+			return (string) $value;
+		}
+	}
+
+	/**
+	 * Log import success
+	 */
+	public function log_import_success( $message, $details = [] ) {
+		$this->write_to_log( $message, 'SUCCESS' );
+		foreach ( $details as $key => $value ) {
+			$formatted_value = $this->format_log_value( $value );
+			$this->write_to_log( "  {$key}: {$formatted_value}", 'SUCCESS' );
+		}
+	}
+
+	/**
+	 * Generate final import summary in log
+	 */
+	public function log_import_summary( $summary_data ) {
+		$this->write_to_log( "\n=== IMPORT SUMMARY ===" );
+		$this->write_to_log( "Products Imported: " . ( $summary_data['products_imported'] ?? 0 ) );
+		$this->write_to_log( "Products Updated: " . ( $summary_data['products_updated'] ?? 0 ) );
+		$this->write_to_log( "Bundles Created: " . ( $summary_data['bundles_created'] ?? 0 ) );
+		
+		// File error summary
+		$file_errors = $this->get_file_not_found_errors();
+		if ( !empty( $file_errors ) ) {
+			$this->write_to_log( "\nFile Errors by Type:" );
+			
+			$error_counts = [
+				'product' => 0,
+				'image' => 0,
+				'sound' => 0,
+				'bundle' => 0
+			];
+			
+			foreach ( $file_errors as $error ) {
+				if ( isset( $error_counts[$error['file_type']] ) ) {
+					$error_counts[$error['file_type']]++;
+				}
+			}
+			
+			foreach ( $error_counts as $type => $count ) {
+				if ( $count > 0 ) {
+					$this->write_to_log( "  {$type} files not found: {$count}" );
+				}
+			}
+			
+			$this->write_to_log( "  Total files not found: " . count( $file_errors ) );
+			
+			// Log detailed file errors if any
+			if ( count( $file_errors ) > 0 ) {
+				$this->write_to_log( "\nDetailed File Errors:" );
+				foreach ( $file_errors as $error ) {
+					$this->write_to_log( "  - SKU: {$error['sku']}, File: {$error['filename']}, Type: {$error['file_type']}" );
+				}
+			}
+		}
+		
+		// General errors
+		if ( isset( $summary_data['errors'] ) && !empty( $summary_data['errors'] ) ) {
+			$this->write_to_log( "\nGeneral Errors: " . count( $summary_data['errors'] ) );
+			foreach ( $summary_data['errors'] as $error ) {
+				$this->write_to_log( "  - {$error}", 'ERROR' );
+			}
+		}
+		
+		$this->write_to_log( "\n=== END IMPORT SUMMARY ===" );
+		$this->write_to_log( "Log file location: " . $this->log_file_path );
+	}
+
+	/**
+	 * Log file not found error with detailed info
+	 */
+	public function log_file_not_found( $product_id, $sku, $filename, $file_type, $search_path = '' ) {
+		// Always add to the error collection
+		$this->add_file_not_found_error( $product_id, $sku, $filename, $file_type );
+		
+		$message = "File not found - Product ID: {$product_id}, SKU: {$sku}, File: {$filename}, Type: {$file_type}";
+		if ( $search_path ) {
+			$message .= ", Search Path: {$search_path}";
+		}
+		
+		// Log to file if available, otherwise log to error_log for debugging
+		if ( $this->log_file_path && file_exists( dirname( $this->log_file_path ) ) ) {
+			$this->write_to_log( $message, 'ERROR' );
+		} else {
+			// Fallback to WordPress error log
+			error_log( "RHD Import File Error: {$message}" );
+		}
+	}
+
+	/**
+	 * Log general import error
+	 */
+	public function log_import_error( $error_message, $context = '' ) {
+		$message = "Import Error: {$error_message}";
+		if ( $context ) {
+			$message .= " (Context: {$context})";
+		}
+		$this->write_to_log( $message, 'ERROR' );
+	}
+
+	/**
+	 * Get current log file path
+	 */
+	public function get_log_file_path() {
+		return $this->log_file_path;
+	}
+
+	/**
+	 * Get log filename only (without path)
+	 */
+	public function get_log_filename() {
+		return $this->log_file_path ? basename( $this->log_file_path ) : null;
+	}
+
+	/**
 	 * Get collected file not found errors
 	 */
 	public function get_file_not_found_errors() {
@@ -85,7 +304,7 @@ class RHD_CSharp_File_Handler {
 		$source_path = $this->find_file_in_protected_folders( $filename, $product->get_sku() );
 
 		if ( !$source_path ) {
-			$this->add_file_not_found_error( $product->get_id(), $product->get_sku(), $filename, 'product' );
+			$this->log_file_not_found( $product->get_id(), $product->get_sku(), $filename, 'product' );
 			return false;
 		}
 
@@ -138,7 +357,7 @@ class RHD_CSharp_File_Handler {
 		$source_path = $this->find_file_in_directory( WP_CONTENT_DIR . '/csharp-import/images', $filename );
 
 		if ( !$source_path ) {
-			$this->add_file_not_found_error( $product_id, $sku, $filename, 'image' );
+			$this->log_file_not_found( $product_id, $sku, $filename, 'image' );
 			return false;
 		}
 
@@ -209,7 +428,7 @@ class RHD_CSharp_File_Handler {
 			$source_path = $this->find_file_in_directory( WP_CONTENT_DIR . '/csharp-import/sounds', $filename );
 
 			if ( !$source_path ) {
-				$this->add_file_not_found_error( $product_id, $sku, $filename, 'sound' );
+				$this->log_file_not_found( $product_id, $sku, $filename, 'sound' );
 				continue;
 			}
 
@@ -262,7 +481,7 @@ class RHD_CSharp_File_Handler {
 			$base_sku = $this->get_base_sku_from_bundle( $product );
 			
 			if ( !$base_sku ) {
-				error_log( 'RHD Import: No base SKU found for bundle ' . $product->get_id() );
+				$this->log_import_error( 'No base SKU found for bundle ' . $product->get_id() );
 				return false;
 			}
 
@@ -270,8 +489,8 @@ class RHD_CSharp_File_Handler {
 			$project_folder = $this->find_project_folder( $base_sku );
 			
 			if ( !$project_folder ) {
-				$this->add_file_not_found_error( $product->get_id(), $product->get_sku(), $base_sku . ' project folder', 'bundle' );
-				error_log( 'RHD Import: Project folder not found for base SKU: ' . $base_sku );
+				$this->log_file_not_found( $product->get_id(), $product->get_sku(), $base_sku . ' project folder', 'bundle' );
+				$this->log_import_error( 'Project folder not found for base SKU: ' . $base_sku );
 				return false;
 			}
 
@@ -280,7 +499,7 @@ class RHD_CSharp_File_Handler {
 
 			return true;
 		} catch ( Exception $e ) {
-			error_log( 'RHD Import: Exception in import_bundle_files: ' . $e->getMessage() );
+			$this->log_import_error( 'Exception in import_bundle_files: ' . $e->getMessage() );
 			return false;
 		}
 	}
@@ -317,7 +536,7 @@ class RHD_CSharp_File_Handler {
 		$project_folder = $this->find_project_folder( $base_sku );
 		
 		if ( !$project_folder ) {
-			error_log( 'RHD Import: Project folder not found for on-demand ZIP creation: ' . $base_sku );
+			$this->log_import_error( 'Project folder not found for on-demand ZIP creation: ' . $base_sku );
 			return false;
 		}
 
@@ -325,7 +544,7 @@ class RHD_CSharp_File_Handler {
 		$zip_path = $this->get_or_create_bundle_zip( $base_sku, $project_folder );
 		
 		if ( !$zip_path ) {
-			error_log( 'RHD Import: Failed to create on-demand ZIP for: ' . $base_sku );
+			$this->log_import_error( 'Failed to create on-demand ZIP for: ' . $base_sku );
 			return false;
 		}
 
@@ -340,14 +559,14 @@ class RHD_CSharp_File_Handler {
 			$protected_files_dir = WP_CONTENT_DIR . '/csharp-import/protected-files';
 			
 			if ( !is_dir( $protected_files_dir ) ) {
-				error_log( 'RHD Import: Protected files directory does not exist: ' . $protected_files_dir );
+				$this->log_import_error( 'Protected files directory does not exist: ' . $protected_files_dir );
 				return false;
 			}
 
 			$folders = scandir( $protected_files_dir );
 			
 			if ( $folders === false ) {
-				error_log( 'RHD Import: Could not scan protected files directory: ' . $protected_files_dir );
+				$this->log_import_error( 'Could not scan protected files directory: ' . $protected_files_dir );
 				return false;
 			}
 			
@@ -365,7 +584,7 @@ class RHD_CSharp_File_Handler {
 			
 			return false;
 		} catch ( Exception $e ) {
-			error_log( 'RHD Import: Exception in find_project_folder: ' . $e->getMessage() );
+			$this->log_import_error( 'Exception in find_project_folder: ' . $e->getMessage() );
 			return false;
 		}
 	}
@@ -381,7 +600,7 @@ class RHD_CSharp_File_Handler {
 			// Ensure woocommerce_uploads directory exists
 			if ( !file_exists( $wc_uploads ) ) {
 				if ( !wp_mkdir_p( $wc_uploads ) ) {
-					error_log( 'RHD Import: Failed to create woocommerce_uploads directory: ' . $wc_uploads );
+					$this->log_import_error( 'Failed to create woocommerce_uploads directory: ' . $wc_uploads );
 					return false;
 				}
 			}
@@ -390,7 +609,7 @@ class RHD_CSharp_File_Handler {
 			$bundles_dir = $wc_uploads . '/bundles';
 			if ( !file_exists( $bundles_dir ) ) {
 				if ( !wp_mkdir_p( $bundles_dir ) ) {
-					error_log( 'RHD Import: Failed to create bundles directory: ' . $bundles_dir );
+					$this->log_import_error( 'Failed to create bundles directory: ' . $bundles_dir );
 					return false;
 				}
 			}
@@ -406,7 +625,7 @@ class RHD_CSharp_File_Handler {
 			// Create new ZIP file
 			return $this->create_zip_from_folder( $project_folder_path, $zip_path );
 		} catch ( Exception $e ) {
-			error_log( 'RHD Import: Exception in get_or_create_bundle_zip: ' . $e->getMessage() );
+			$this->log_import_error( 'Exception in get_or_create_bundle_zip: ' . $e->getMessage() );
 			return false;
 		}
 	}
@@ -418,13 +637,13 @@ class RHD_CSharp_File_Handler {
 		try {
 			// Check if ZipArchive class exists
 			if ( !class_exists( 'ZipArchive' ) ) {
-				error_log( 'RHD Import: ZipArchive class not available. PHP zip extension may not be installed.' );
+				$this->log_import_error( 'ZipArchive class not available. PHP zip extension may not be installed.' );
 				return false;
 			}
 
 			// Validate source folder
 			if ( !is_dir( $source_folder ) ) {
-				error_log( 'RHD Import: Source folder does not exist: ' . $source_folder );
+				$this->log_import_error( 'Source folder does not exist: ' . $source_folder );
 				return false;
 			}
 
@@ -432,7 +651,7 @@ class RHD_CSharp_File_Handler {
 			$result = $zip->open( $zip_path, ZipArchive::CREATE | ZipArchive::OVERWRITE );
 			
 			if ( $result !== TRUE ) {
-				error_log( 'RHD Import: Failed to create ZIP archive. Error code: ' . $result . ', Path: ' . $zip_path );
+				$this->log_import_error( 'Failed to create ZIP archive. Error code: ' . $result . ', Path: ' . $zip_path );
 				return false;
 			}
 
@@ -443,7 +662,7 @@ class RHD_CSharp_File_Handler {
 					RecursiveIteratorIterator::LEAVES_ONLY
 				);
 			} catch ( Exception $e ) {
-				error_log( 'RHD Import: Failed to create recursive directory iterator: ' . $e->getMessage() );
+				$this->log_import_error( 'Failed to create recursive directory iterator: ' . $e->getMessage() );
 				$zip->close();
 				return false;
 			}
@@ -457,7 +676,7 @@ class RHD_CSharp_File_Handler {
 					if ( $zip->addFile( $file_path, $relative_path ) ) {
 						$file_count++;
 					} else {
-						error_log( 'RHD Import: Failed to add file to ZIP: ' . $file_path );
+						$this->log_import_error( 'Failed to add file to ZIP: ' . $file_path );
 					}
 				}
 			}
@@ -465,18 +684,18 @@ class RHD_CSharp_File_Handler {
 			$zip_result = $zip->close();
 			
 			if ( !$zip_result ) {
-				error_log( 'RHD Import: Failed to close ZIP archive: ' . $zip_path );
+				$this->log_import_error( 'Failed to close ZIP archive: ' . $zip_path );
 				return false;
 			}
 
 			if ( $file_count === 0 ) {
-				error_log( 'RHD Import: No files were added to ZIP archive: ' . $zip_path );
+				$this->log_import_error( 'No files were added to ZIP archive: ' . $zip_path );
 				return false;
 			}
 
 			return file_exists( $zip_path ) ? $zip_path : false;
 		} catch ( Exception $e ) {
-			error_log( 'RHD Import: Exception in create_zip_from_folder: ' . $e->getMessage() );
+			$this->log_import_error( 'Exception in create_zip_from_folder: ' . $e->getMessage() );
 			return false;
 		}
 	}

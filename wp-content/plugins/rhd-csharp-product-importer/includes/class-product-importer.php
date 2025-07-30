@@ -115,7 +115,7 @@ class RHD_CSharp_Product_Importer {
 	/**
 	 * Process a chunk of CSV data
 	 */
-	public function process_chunk( $chunk_data, $update_existing = false ) {
+	public function process_chunk( $chunk_data, $update_existing = false, $file_handler = null ) {
 		$results = [
 			'products_imported' => 0,
 			'products_updated'  => 0,
@@ -123,8 +123,10 @@ class RHD_CSharp_Product_Importer {
 			'file_not_found'    => [], // Add file not found errors
 		];
 
-		// Create a single file handler instance to collect all file errors
-		$file_handler = new RHD_CSharp_File_Handler();
+		// Create a file handler instance if not provided
+		if ( !$file_handler ) {
+			$file_handler = new RHD_CSharp_File_Handler();
+		}
 
 		// Process the chunk
 		foreach ( $chunk_data as $row ) {
@@ -144,16 +146,20 @@ class RHD_CSharp_Product_Importer {
 					$pod = pods( 'product', $product_id );
 					if ( $update_existing && $pod->field( 'rhd_csharp_importer' ) ) {
 						$results['products_updated']++;
+						$file_handler->log_import_success( "Updated product: {$row['Product ID']}" );
 					} else {
 						$results['products_imported']++;
+						$file_handler->log_import_success( "Imported product: {$row['Product ID']}" );
 					}
 				}
 			} catch ( Exception $e ) {
-				$results['errors'][] = sprintf(
+				$error_msg = sprintf(
 					__( 'Error importing product %s: %s', 'rhd' ),
 					$row['Product ID'] ?? 'Unknown',
 					$e->getMessage()
 				);
+				$results['errors'][] = $error_msg;
+				$file_handler->log_import_error( $error_msg, 'Product Import' );
 			}
 		}
 
