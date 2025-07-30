@@ -9,50 +9,10 @@ class RHD_CSharp_Ajax_Handler {
 	 */
 	public function __construct() {
 		// AJAX handlers
-		// add_action( 'wp_ajax_rhd_import_products', [$this, 'ajax_import_products'] ); // ORPHANED
 		add_action( 'wp_ajax_rhd_get_csv_info', [$this, 'ajax_get_csv_info'] );
 		add_action( 'wp_ajax_rhd_process_chunk', [$this, 'ajax_process_chunk'] );
 		add_action( 'wp_ajax_rhd_finalize_import', [$this, 'ajax_finalize_import'] );
 	}
-
-	/**
-	 * Handle AJAX import request
-	 */
-	// public function ajax_import_products() {
-	// 	error_log( 'ajax_import_products' );
-	// 	if ( !$this->verify_ajax_request() ) {
-	// 		return;
-	// 	}
-
-	// 	$create_bundles  = isset( $_POST['create_bundles'] ) && '1' === $_POST['create_bundles'];
-	// 	$update_existing = isset( $_POST['update_existing'] ) && '1' === $_POST['update_existing'];
-
-	// 	// Handle file upload
-	// 	if ( empty( $_FILES['csv_file'] ) || UPLOAD_ERR_OK !== $_FILES['csv_file']['error'] ) {
-	// 		wp_send_json_error( __( 'Please select a valid CSV file', 'rhd' ) );
-	// 	}
-
-	// 	$file_path = $_FILES['csv_file']['tmp_name'];
-
-	// 	try {
-	// 		$csv_parser       = new RHD_CSharp_CSV_Parser();
-	// 		$product_importer = new RHD_CSharp_Product_Importer();
-
-	// 		$results = $product_importer->import_products_from_csv( $file_path, $update_existing, $create_bundles );
-
-	// 		wp_send_json_success( [
-	// 			'message' => sprintf(
-	// 				__( 'Import completed successfully. Products imported: %d, Products updated: %d, Bundles created: %d', 'rhd' ),
-	// 				$results['products_imported'],
-	// 				$results['products_updated'],
-	// 				$results['bundles_created']
-	// 			),
-	// 			'details' => $results,
-	// 		] );
-	// 	} catch ( Exception $e ) {
-	// 		wp_send_json_error( sprintf( __( 'Import failed: %s', 'rhd' ), $e->getMessage() ) );
-	// 	}
-	// }
 
 	/**
 	 * Get CSV file information
@@ -154,8 +114,7 @@ class RHD_CSharp_Ajax_Handler {
 			return;
 		}
 
-		$temp_file      = sanitize_text_field( $_POST['temp_file'] ?? '' );
-		$create_bundles = isset( $_POST['create_bundles'] ) && '1' === $_POST['create_bundles'];
+		$temp_file = sanitize_text_field( $_POST['temp_file'] ?? '' );
 
 		if ( empty( $temp_file ) ) {
 			wp_send_json_error( __( 'No temporary file specified', 'rhd' ) );
@@ -170,7 +129,8 @@ class RHD_CSharp_Ajax_Handler {
 			$csv_parser     = new RHD_CSharp_CSV_Parser();
 			$bundle_creator = new RHD_CSharp_Bundle_Creator();
 
-			$results = $bundle_creator->finalize_import( $file_path, $create_bundles );
+			// Always create bundles
+			$results = $bundle_creator->finalize_import( $file_path );
 
 			// Clean up temp file
 			unlink( $file_path );

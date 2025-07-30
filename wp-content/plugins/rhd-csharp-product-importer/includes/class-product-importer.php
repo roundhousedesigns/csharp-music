@@ -7,7 +7,7 @@ class RHD_CSharp_Product_Importer {
 	/**
 	 * Import products from CSV file
 	 */
-	public function import_products_from_csv( $file_path, $update_existing = false, $create_bundles = false ) {
+	public function import_products_from_csv( $file_path, $update_existing = false ) {
 		$csv_parser     = new RHD_CSharp_CSV_Parser();
 		$bundle_creator = new RHD_CSharp_Bundle_Creator();
 
@@ -81,31 +81,29 @@ class RHD_CSharp_Product_Importer {
 		}
 
 		// Second pass: Process Full Set products and create bundles
-		if ( $create_bundles ) {
-			foreach ( $csv_data as $row ) {
-				if ( empty( $row['Product ID'] ) ) {
-					continue;
-				}
+		foreach ( $csv_data as $row ) {
+			if ( empty( $row['Product ID'] ) ) {
+				continue;
+			}
 
-				// Only process Full Set products in second pass
-				if ( isset( $row['Single Instrument'] ) && strtolower( trim( $row['Single Instrument'] ) ) === 'full set' ) {
-					$base_sku = $this->get_base_sku( $row['Product ID'] );
+			// Only process Full Set products in second pass
+			if ( isset( $row['Single Instrument'] ) && strtolower( trim( $row['Single Instrument'] ) ) === 'full set' ) {
+				$base_sku = $this->get_base_sku( $row['Product ID'] );
 
-					if ( isset( $product_families[$base_sku] ) ) {
-						$product_families[$base_sku]['full_set_data'] = $row;
+				if ( isset( $product_families[$base_sku] ) ) {
+					$product_families[$base_sku]['full_set_data'] = $row;
 
-						try {
-							$bundle_id = $bundle_creator->create_product_bundle( $base_sku, $product_families[$base_sku] );
-							if ( $bundle_id ) {
-								$results['bundles_created']++;
-							}
-						} catch ( Exception $e ) {
-							$results['errors'][] = sprintf(
-								__( 'Error creating bundle for %s: %s', 'rhd' ),
-								$base_sku,
-								$e->getMessage()
-							);
+					try {
+						$bundle_id = $bundle_creator->create_product_bundle( $base_sku, $product_families[$base_sku] );
+						if ( $bundle_id ) {
+							$results['bundles_created']++;
 						}
+					} catch ( Exception $e ) {
+						$results['errors'][] = sprintf(
+							__( 'Error creating bundle for %s: %s', 'rhd' ),
+							$base_sku,
+							$e->getMessage()
+						);
 					}
 				}
 			}

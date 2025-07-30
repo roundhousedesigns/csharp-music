@@ -25,7 +25,6 @@ jQuery(document).ready(function ($) {
 		showProgress("Analyzing CSV file...", 0, 0);
 		$resultsDiv.hide();
 
-		const createBundles = $("#create_bundles").is(":checked");
 		const updateExisting = $("#update_existing").is(":checked");
 
 		// Step 1: Get CSV info and total count
@@ -50,8 +49,8 @@ jQuery(document).ready(function ($) {
 						return;
 					}
 
-					// Start chunked processing
-					processChunks(tempFile, totalRows, createBundles, updateExisting);
+					// Start chunked processing - bundles are always created
+					processChunks(tempFile, totalRows, updateExisting);
 				} else {
 					showError(response.data || "Failed to analyze CSV file.");
 				}
@@ -62,7 +61,7 @@ jQuery(document).ready(function ($) {
 		});
 	});
 
-	function processChunks(tempFile, totalRows, createBundles, updateExisting) {
+	function processChunks(tempFile, totalRows, updateExisting) {
 		let currentOffset = 0;
 		const chunkSize = 50; // Process 50 products at a time
 		let totalImported = 0;
@@ -75,8 +74,8 @@ jQuery(document).ready(function ($) {
 			const currentChunkSize = Math.min(chunkSize, remaining);
 			
 			if (remaining <= 0) {
-				// All products processed, now finalize
-				finalizeImport(tempFile, createBundles, totalImported, totalUpdated, allErrors, allFileNotFoundErrors);
+				// All products processed, now finalize with bundle creation
+				finalizeImport(tempFile, totalImported, totalUpdated, allErrors, allFileNotFoundErrors);
 				return;
 			}
 
@@ -133,7 +132,7 @@ jQuery(document).ready(function ($) {
 		processNextChunk();
 	}
 
-	function finalizeImport(tempFile, createBundles, totalImported, totalUpdated, allErrors, allFileNotFoundErrors) {
+	function finalizeImport(tempFile, totalImported, totalUpdated, allErrors, allFileNotFoundErrors) {
 		showProgress("Finalizing import (setting up grouped products and bundles)...", 0, 0, true);
 
 		$.ajax({
@@ -142,8 +141,7 @@ jQuery(document).ready(function ($) {
 			data: {
 				action: "rhd_finalize_import",
 				nonce: rhdImporter.nonce,
-				temp_file: tempFile,
-				create_bundles: createBundles ? "1" : "0"
+				temp_file: tempFile
 			},
 			success: function(response) {
 				$progressDiv.hide();
@@ -229,7 +227,7 @@ jQuery(document).ready(function ($) {
 				}
 			},
 			error: function(xhr, status, error) {
-				showError("Finalization failed: " + error);
+				showError("Something went wrong: " + error);
 			}
 		});
 	}

@@ -64,7 +64,7 @@ class RHD_CSharp_Bundle_Creator {
 
 		// Import bundle featured image
 		$file_handler = new RHD_CSharp_File_Handler();
-		
+		$file_handler->import_product_files( $bundle, $bundle_data );
 
 		// Update bundled products
 		$this->add_products_to_bundle( $bundle_id, $base_sku, $family_data );
@@ -220,7 +220,7 @@ class RHD_CSharp_Bundle_Creator {
 	/**
 	 * Finalize import by creating bundles for Full Set products
 	 */
-	public function finalize_import( $file_path, $create_bundles = false ) {
+	public function finalize_import( $file_path ) {
 		$csv_parser       = new RHD_CSharp_CSV_Parser();
 		$product_importer = new RHD_CSharp_Product_Importer();
 
@@ -278,22 +278,20 @@ class RHD_CSharp_Bundle_Creator {
 		];
 
 		// Create bundles for all families with Full Set data
-		if ( $create_bundles ) {
-			foreach ( $product_families as $base_sku => $family_data ) {
-				if ( $family_data['full_set_data'] && count( $family_data['products'] ) > 0 ) {
-					try {
-						$bundle_id = $this->create_product_bundle( $base_sku, $family_data );
-						if ( $bundle_id ) {
-							$results['bundles_created']++;
-						}
-					} catch ( Exception $e ) {
-						$error_msg = sprintf(
-							__( 'Error creating bundle for %s: %s', 'rhd' ),
-							$base_sku,
-							$e->getMessage()
-						);
-						$results['errors'][] = $error_msg;
+		foreach ( $product_families as $base_sku => $family_data ) {
+			if ( $family_data['full_set_data'] && count( $family_data['products'] ) > 0 ) {
+				try {
+					$bundle_id = $this->create_product_bundle( $base_sku, $family_data );
+					if ( $bundle_id ) {
+						$results['bundles_created']++;
 					}
+				} catch ( Exception $e ) {
+					$error_msg = sprintf(
+						__( 'Error creating bundle for %s: %s', 'rhd' ),
+						$base_sku,
+						$e->getMessage()
+					);
+					$results['errors'][] = $error_msg;
 				}
 			}
 		}
@@ -328,7 +326,6 @@ class RHD_CSharp_Bundle_Creator {
 	 */
 	private function update_bundle_meta( $bundle, $base_sku, $data ) {
 
-		// TODO change this to attributes `pa_`
 		$bundle->update_meta_data( '_bundle_base_sku', $base_sku );
 
 		// Set global product attributes using shared method

@@ -50,7 +50,7 @@ class RHD_CSharp_File_Handler {
 		}
 
 		// Handle sound files
-		$sound_files_field = 'Sound Filenames (comma-separated)\nExample: f-warmup.mp3, g-warmup.wav';
+		$sound_files_field = 'Sound Filenames (comma-separated)';
 		if ( !empty( $data[$sound_files_field] ) ) {
 			$this->import_sound_files( $product->get_id(), $data[$sound_files_field], $product->get_sku() );
 		}
@@ -95,7 +95,7 @@ class RHD_CSharp_File_Handler {
 
 			$product->set_downloads( $downloads );
 			$product->set_downloadable( true );
-			$result = $product->save();
+			$product->save();
 
 			return true;
 		}
@@ -125,10 +125,10 @@ class RHD_CSharp_File_Handler {
 
 		if ( !$source_path ) {
 			$this->add_file_not_found_error( $product_id, $sku, $filename, 'image' );
-			error_log( "Image file not found: {$filename}" );
 			return false;
 		}
 
+		// Even though sanitize_file_name() is used in wp_unique_filename(), we're using it to check if the file already exists in the Media Library
 		$sanitized_filename = sanitize_file_name( $filename );
 
 		// Check if image already exists in Media Library (by sanitized filename)
@@ -168,7 +168,6 @@ class RHD_CSharp_File_Handler {
 			}
 		}
 
-		error_log( "Failed to import image: {$source_path} -> {$destination_path}" );
 		return false;
 	}
 
@@ -180,8 +179,8 @@ class RHD_CSharp_File_Handler {
 			return [];
 		}
 
-		// Parse comma-separated filenames
-		$filenames      = array_map( 'trim', explode( ',', $filenames_string ) );
+		// Parse semicolon-separated filenames
+		$filenames      = array_map( 'trim', explode( ';', $filenames_string ) );
 		$sound_file_ids = [];
 
 		foreach ( $filenames as $filename ) {
@@ -189,15 +188,18 @@ class RHD_CSharp_File_Handler {
 				continue;
 			}
 
+			// If the file doesn't have an extension, assume .mp3
+			$filename = preg_match( '/\.\w{3,4}$/', $filename ) ? $filename : $filename . '.mp3';
+
 			// Find the actual file path using flexible matching
 			$source_path = $this->find_file_in_directory( WP_CONTENT_DIR . '/csharp-import/sounds', $filename );
 
 			if ( !$source_path ) {
 				$this->add_file_not_found_error( $product_id, $sku, $filename, 'sound' );
-				error_log( "Sound file not found: {$filename}" );
 				continue;
 			}
 
+			// Even though sanitize_file_name() is used in wp_unique_filename(), we're using it to check if the file already exists in the Media Library
 			$sanitized_filename = sanitize_file_name( $filename );
 
 			// Check if file already exists (by sanitized filename)
@@ -226,16 +228,13 @@ class RHD_CSharp_File_Handler {
 				if ( !is_wp_error( $attachment_id ) ) {
 					$sound_file_ids[] = $attachment_id;
 				}
-			} else {
-				error_log( "Failed to copy sound file: {$source_path} -> {$destination_path}" );
 			}
 		}
 
-		// Store sound file IDs as Pods field or meta
+		// Store sound file IDs as Pods field
 		if ( !empty( $sound_file_ids ) ) {
 			$pod = pods( 'product', $product_id );
-			// TODO: add sound files to the product as array of attachment IDs
-			// $pod->save( 'sound_files', $sound_file_ids );
+			$pod->save( ['audio_files' => $sound_file_ids] );
 		}
 
 		return $sound_file_ids;
@@ -278,7 +277,6 @@ class RHD_CSharp_File_Handler {
 			}
 		}
 
-		error_log( "File not found with any variation: {$filename} in {$directory}" );
 		return false;
 	}
 
