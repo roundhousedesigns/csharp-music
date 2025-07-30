@@ -7,7 +7,7 @@ class RHD_CSharp_Bundle_Creator {
 	/**
 	 * Create product bundle
 	 */
-	public function create_product_bundle( $base_sku, $family_data ) {
+	public function create_product_bundle( $base_sku, $family_data, $create_zip = true, $file_handler = null ) {
 		// Check if WooCommerce Product Bundles is active
 		if ( !class_exists( 'WC_Product_Bundle' ) ) {
 			return false;
@@ -25,17 +25,17 @@ class RHD_CSharp_Bundle_Creator {
 
 		if ( $existing_bundle_id ) {
 			// Update existing bundle
-			return $this->update_existing_bundle( $existing_bundle_id, $base_sku, $bundle_data, $family_data );
+			return $this->update_existing_bundle( $existing_bundle_id, $base_sku, $bundle_data, $family_data, $create_zip, $file_handler );
 		}
 
 		// Create new bundle
-		return $this->create_new_bundle( $base_sku, $bundle_data, $family_data );
+		return $this->create_new_bundle( $base_sku, $bundle_data, $family_data, $create_zip, $file_handler );
 	}
 
 	/**
 	 * Update existing bundle
 	 */
-	private function update_existing_bundle( $bundle_id, $base_sku, $bundle_data, $family_data ) {
+	private function update_existing_bundle( $bundle_id, $base_sku, $bundle_data, $family_data, $create_zip = true, $file_handler = null ) {
 		$bundle = wc_get_product( $bundle_id );
 		if ( !$bundle || !is_a( $bundle, 'WC_Product_Bundle' ) ) {
 			return false;
@@ -52,6 +52,10 @@ class RHD_CSharp_Bundle_Creator {
 		$bundle_price = floatval( $bundle_data['Price'] ?? 0 );
 		$bundle->set_regular_price( $bundle_price );
 
+		// Mark bundle as downloadable
+		$bundle->set_downloadable( true );
+		$bundle->set_virtual( true );
+
 		// Set categories
 		if ( !empty( $bundle_data['Category'] ) ) {
 			$this->set_product_categories( $bundle, $bundle_data['Category'] );
@@ -62,9 +66,13 @@ class RHD_CSharp_Bundle_Creator {
 
 		$bundle->save();
 
-		// Import bundle featured image
-		$file_handler = new RHD_CSharp_File_Handler();
-		$file_handler->import_product_files( $bundle, $bundle_data );
+		// Import bundle files (including ZIP creation) only if requested
+		if ( $create_zip ) {
+			if ( !$file_handler ) {
+				$file_handler = new RHD_CSharp_File_Handler();
+			}
+			$file_handler->import_product_files( $bundle, $bundle_data );
+		}
 
 		// Update bundled products
 		$this->add_products_to_bundle( $bundle_id, $base_sku, $family_data );
@@ -75,7 +83,7 @@ class RHD_CSharp_Bundle_Creator {
 	/**
 	 * Create new bundle
 	 */
-	private function create_new_bundle( $base_sku, $bundle_data, $family_data ) {
+	private function create_new_bundle( $base_sku, $bundle_data, $family_data, $create_zip = true, $file_handler = null ) {
 		$bundle_title = $bundle_data['Product Title'] ?? '';
 		$bundle_title = preg_replace( '/\s*-\s*Full Set$/i', '', $bundle_title );
 
@@ -88,6 +96,10 @@ class RHD_CSharp_Bundle_Creator {
 		// Set the price from CSV data
 		$bundle_price = floatval( $bundle_data['Price'] ?? 0 );
 		$bundle->set_regular_price( $bundle_price );
+
+		// Mark bundle as downloadable
+		$bundle->set_downloadable( true );
+		$bundle->set_virtual( true );
 
 		$bundle->set_catalog_visibility( 'visible' );
 		$bundle->set_status( 'publish' );
@@ -102,9 +114,11 @@ class RHD_CSharp_Bundle_Creator {
 
 		$bundle_id = $bundle->save();
 
-		// Import and associate product files
-		if ( $bundle_id ) {
-			$file_handler = new RHD_CSharp_File_Handler();
+		// Import and associate product files (including ZIP creation) only if requested
+		if ( $bundle_id && $create_zip ) {
+			if ( !$file_handler ) {
+				$file_handler = new RHD_CSharp_File_Handler();
+			}
 			$file_handler->import_product_files( $bundle, $bundle_data );
 		}
 
@@ -281,9 +295,18 @@ class RHD_CSharp_Bundle_Creator {
 		foreach ( $product_families as $base_sku => $family_data ) {
 			if ( $family_data['full_set_data'] && count( $family_data['products'] ) > 0 ) {
 				try {
+					error_log( 'RHD Import: Creating bundle for base SKU: ' . $base_sku );
 					$bundle_id = $this->create_product_bundle( $base_sku, $family_data );
 					if ( $bundle_id ) {
 						$results['bundles_created']++;
+						error_log( 'RHD Import: Successfully created bundle ' . $bundle_id . ' for base SKU: ' . $base_sku );
+					} else {
+						$error_msg = sprintf(
+							__( 'Failed to create bundle for %s: Unknown error', 'rhd' ),
+							$base_sku
+						);
+						$results['errors'][] = $error_msg;
+						error_log( 'RHD Import: ' . $error_msg );
 					}
 				} catch ( Exception $e ) {
 					$error_msg = sprintf(
@@ -292,11 +315,85 @@ class RHD_CSharp_Bundle_Creator {
 						$e->getMessage()
 					);
 					$results['errors'][] = $error_msg;
+					error_log( 'RHD Import: Exception creating bundle for ' . $base_sku . ': ' . $e->getMessage() );
+				} catch ( Error $e ) {
+					$error_msg = sprintf(
+						__( 'Fatal error creating bundle for %s: %s', 'rhd' ),
+						$base_sku,
+						$e->getMessage()
+					);
+					$results['errors'][] = $error_msg;
+					error_log( 'RHD Import: Fatal error creating bundle for ' . $base_sku . ': ' . $e->getMessage() );
 				}
 			}
 		}
 
 		return $results;
+	}
+
+	/**
+	 * Prepare bundle families data for chunked processing
+	 */
+	public function prepare_bundle_families( $file_path ) {
+		$csv_parser = new RHD_CSharp_CSV_Parser();
+
+		// Parse CSV to rebuild product families
+		$csv_data = $csv_parser->parse( $file_path );
+
+		$product_families = [];
+
+		// Rebuild product families from imported products (excluding Full Set products)
+		foreach ( $csv_data as $row ) {
+			if ( empty( $row['Product ID'] ) ) {
+				continue;
+			}
+
+			// Skip Full Set products in first pass
+			if ( isset( $row['Single Instrument'] ) && strtolower( trim( $row['Single Instrument'] ) ) === 'full set' ) {
+				continue;
+			}
+
+			$product_id = wc_get_product_id_by_sku( $row['Product ID'] );
+			if ( !$product_id ) {
+				continue;
+			}
+
+			$base_sku = $this->get_base_sku( $row['Product ID'] );
+			if ( !isset( $product_families[$base_sku] ) ) {
+				$product_families[$base_sku] = [
+					'products'      => [],
+					'full_set_data' => null,
+					'base_data'     => $row,
+				];
+			}
+			$product_families[$base_sku]['products'][] = $product_id;
+		}
+
+		// Second pass: Process Full Set products and add their data
+		foreach ( $csv_data as $row ) {
+			if ( empty( $row['Product ID'] ) ) {
+				continue;
+			}
+
+			// Only process Full Set products in second pass
+			if ( isset( $row['Single Instrument'] ) && strtolower( trim( $row['Single Instrument'] ) ) === 'full set' ) {
+				$base_sku = $this->get_base_sku( $row['Product ID'] );
+
+				if ( isset( $product_families[$base_sku] ) ) {
+					$product_families[$base_sku]['full_set_data'] = $row;
+				}
+			}
+		}
+
+		// Filter to only return families that have Full Set data and products
+		$valid_families = [];
+		foreach ( $product_families as $base_sku => $family_data ) {
+			if ( $family_data['full_set_data'] && count( $family_data['products'] ) > 0 ) {
+				$valid_families[$base_sku] = $family_data;
+			}
+		}
+
+		return $valid_families;
 	}
 
 	/**
