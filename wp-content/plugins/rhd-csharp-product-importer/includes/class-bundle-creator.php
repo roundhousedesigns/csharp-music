@@ -64,16 +64,14 @@ class RHD_CSharp_Bundle_Creator {
 		// Update custom meta
 		$this->update_bundle_meta( $bundle, $base_sku, $bundle_data );
 
-		$bundle->save();
-
-		// Import bundle files (including ZIP creation) only if requested
-		if ( $create_zip ) {
-			if ( !$file_handler ) {
-				$file_handler = new RHD_CSharp_File_Handler();
-			}
-			$file_handler->import_product_files( $bundle, $bundle_data );
+				$bundle->save();
+		
+		// Import bundle files using provided filenames (no ZIP creation)
+		if ( !$file_handler ) {
+			$file_handler = new RHD_CSharp_File_Handler();
 		}
-
+		$file_handler->import_product_files( $bundle, $bundle_data );
+		
 		// Update bundled products
 		$this->add_products_to_bundle( $bundle_id, $base_sku, $family_data );
 
@@ -112,16 +110,16 @@ class RHD_CSharp_Bundle_Creator {
 		// Set custom meta
 		$this->update_bundle_meta( $bundle, $base_sku, $bundle_data );
 
-		$bundle_id = $bundle->save();
-
-		// Import and associate product files (including ZIP creation) only if requested
-		if ( $bundle_id && $create_zip ) {
+				$bundle_id = $bundle->save();
+		
+		// Import and associate product files using provided filenames (no ZIP creation)
+		if ( $bundle_id ) {
 			if ( !$file_handler ) {
 				$file_handler = new RHD_CSharp_File_Handler();
 			}
 			$file_handler->import_product_files( $bundle, $bundle_data );
 		}
-
+		
 		// Add bundled products
 		if ( $bundle_id ) {
 			$this->add_products_to_bundle( $bundle_id, $base_sku, $family_data );

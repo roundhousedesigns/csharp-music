@@ -80,7 +80,7 @@ class RHD_CSharp_Product_Importer {
 			}
 		}
 
-		// Second pass: Process Full Set products and create bundles
+		// Second pass: Process Full Set products and update their bundle product content
 		foreach ( $csv_data as $row ) {
 			if ( empty( $row['Product ID'] ) ) {
 				continue;
@@ -94,7 +94,8 @@ class RHD_CSharp_Product_Importer {
 					$product_families[$base_sku]['full_set_data'] = $row;
 
 					try {
-						$bundle_id = $bundle_creator->create_product_bundle( $base_sku, $product_families[$base_sku] );
+						// Create or update the bundle product without ZIP creation
+						$bundle_id = $bundle_creator->create_product_bundle( $base_sku, $product_families[$base_sku], false );
 						if ( $bundle_id ) {
 							$results['bundles_created']++;
 						}
