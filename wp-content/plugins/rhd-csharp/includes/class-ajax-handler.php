@@ -5,6 +5,36 @@
 class RHD_CSharp_Ajax_Handler {
 
 	/**
+	 * Prepare environment for long-running operations to mitigate timeouts
+	 */
+	private function prepare_long_running_process() {
+		if ( function_exists( 'wc_set_time_limit' ) ) {
+			wc_set_time_limit( 0 );
+		} else {
+			@set_time_limit( 0 );
+			@ini_set( 'max_execution_time', '0' );
+		}
+
+		if ( function_exists( 'wp_raise_memory_limit' ) ) {
+			wp_raise_memory_limit( 'admin' );
+		}
+		@ini_set( 'memory_limit', '1024M' );
+
+		ignore_user_abort( true );
+	}
+
+	/**
+	 * Keep the PHP execution timer fresh during loops
+	 */
+	private function tick_execution_time( $seconds = 30 ) {
+		if ( function_exists( 'wc_set_time_limit' ) ) {
+			wc_set_time_limit( $seconds );
+		} else {
+			@set_time_limit( $seconds );
+		}
+	}
+
+	/**
 	 * Constructor
 	 */
 	public function __construct() {
@@ -19,6 +49,7 @@ class RHD_CSharp_Ajax_Handler {
 	 * Get CSV file information
 	 */
 	public function ajax_get_csv_info() {
+		$this->prepare_long_running_process();
 		if ( !$this->verify_ajax_request() ) {
 			return;
 		}
@@ -40,6 +71,7 @@ class RHD_CSharp_Ajax_Handler {
 			$total_rows = 0;
 			if ( ( $handle = fopen( $file_path, 'r' ) ) !== false ) {
 				while ( ( $row = fgetcsv( $handle, 0, ',' ) ) !== false ) {
+					$this->tick_execution_time();
 					$total_rows++;
 				}
 				fclose( $handle );
@@ -76,6 +108,7 @@ class RHD_CSharp_Ajax_Handler {
 	 * Process CSV in chunks
 	 */
 	public function ajax_process_chunk() {
+		$this->prepare_long_running_process();
 		if ( !$this->verify_ajax_request() ) {
 			return;
 		}
@@ -118,6 +151,7 @@ class RHD_CSharp_Ajax_Handler {
 			}
 			$file_handler->write_to_log( "Processing chunk: offset {$offset}, size " . count( $chunk_data ) );
 
+			$this->tick_execution_time();
 			$results = $product_importer->process_chunk( $chunk_data, $update_existing, $file_handler );
 
 			$processed   = $offset + count( $chunk_data );
@@ -155,6 +189,7 @@ class RHD_CSharp_Ajax_Handler {
 	 * Finalize import by preparing bundle creation data
 	 */
 	public function ajax_finalize_import() {
+		$this->prepare_long_running_process();
 		if ( !$this->verify_ajax_request() ) {
 			return;
 		}
@@ -224,6 +259,7 @@ class RHD_CSharp_Ajax_Handler {
 	 * Process bundles in chunks
 	 */
 	public function ajax_process_bundles() {
+		$this->prepare_long_running_process();
 		if ( !$this->verify_ajax_request() ) {
 			return;
 		}
@@ -272,6 +308,7 @@ class RHD_CSharp_Ajax_Handler {
 
 			// Process each family in the chunk
 			foreach ( $families_chunk as $base_sku => $family_data ) {
+				$this->tick_execution_time();
 				try {
 					$file_handler->write_to_log( "Creating bundle for base SKU: {$base_sku}" );
 					$bundle_id = $bundle_creator->create_product_bundle( $base_sku, $family_data, false, $file_handler ); // false = skip ZIP creation

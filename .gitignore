@@ -76,5 +76,4 @@ Thumbs.db
 !tests/**
 
 # Plugins and Themes
-!wp-content/plugins/rhd-csharp-product-importer
-
+!wp-content/plugins/rhd-csharp

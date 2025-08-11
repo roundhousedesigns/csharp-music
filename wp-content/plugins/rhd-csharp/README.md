@@ -1,6 +1,6 @@
-# RHD C. Sharp Product Importer
+# RHD C. Sharp
 
-A WordPress plugin for importing C. Sharp music products into WooCommerce with automatic Product Bundle creation.
+A WordPress plugin which adds custom functionality to C. Sharp Music, including a custom bulk import tool for migrating C. Sharp music products into WooCommerce with automatic Product Bundle creation.
 
 ## Features
 
@@ -8,7 +8,7 @@ A WordPress plugin for importing C. Sharp music products into WooCommerce with a
 - **Automatic Product Bundles**: Creates bundles for product families based on SKU prefixes
 - **WooCommerce Integration**: Full integration with WooCommerce products and categories
 - **Product Family Grouping**: Groups related products (e.g., CB-1001-SC, CB-1001-FL1) into bundles
-- **Custom Meta Fields**: Imports custom product data like grade, instrumentation, etc.
+- **Custom Meta Fields**: Imports custom product data like difficulty, instrumentation, etc.
 - **Error Handling**: Comprehensive error reporting during import process
 
 ## Requirements
@@ -38,8 +38,8 @@ The CSV file should contain the following columns:
 - **Category**: Product category
 - **Image File Name**: Image reference
 - **Byline**: Author/composer information
-- **For whom**: Target audience
-- **Grade**: Difficulty grade
+- **Ensemble Type**: Target audience
+- **Difficulty**: Difficulty difficulty
 - **Description**: Product description
 - **Soundcloud Link**: Audio sample URL
 - **Soundcloud Link 2**: Additional audio sample URL
@@ -59,6 +59,7 @@ The CSV file should contain the following columns:
 ### SKU Family Logic
 
 Products are grouped into families based on their SKU prefix:
+
 - `CB-1001` (Full Set)
 - `CB-1001-SC` (Score)
 - `CB-1001-FL1` (Flute 1)
@@ -89,7 +90,7 @@ All products with the same base SKU (`CB-1001`) are grouped into one bundle titl
 The following custom meta fields are added to products:
 
 - `_single_instrument`: Instrument type
-- `_grade`: Difficulty grade
+- `_difficulty`: Difficulty difficulty
 - `_for_whom`: Target audience
 - `_byline`: Author/composer
 - `_instrumentation`: Instrumentation details
@@ -99,6 +100,7 @@ The following custom meta fields are added to products:
 ## Error Handling
 
 The plugin provides detailed error reporting for:
+
 - CSV parsing issues
 - Product creation failures
 - Bundle creation problems
@@ -110,8 +112,8 @@ The plugin provides detailed error reporting for:
 ### Plugin Structure
 
 ```
-rhd-csharp-product-importer/
-├── rhd-csharp-product-importer.php  # Main plugin file
+rhd-csharp/
+├── rhd-csharp.php  # Main plugin file
 ├── assets/
 │   └── admin.js                     # Admin interface JavaScript
 ├── README.md                        # Documentation
@@ -131,4 +133,4 @@ For issues or questions, contact [Roundhouse Designs](https://roundhouse-designs
 
 ## License
 
-GPL-2.0+ License 
+GPL-2.0+ License

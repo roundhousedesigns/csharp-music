@@ -1,7 +1,7 @@
 <?php
 /**
- * Plugin Name: RHD C. Sharp Product Importer
- * Description: Imports C. Sharp products into WooCommerce. Requires WooCommerce, WooCommerce Product Bundles, and Pods.io.
+ * Plugin Name: RHD C. Sharp
+ * Description: C. Sharp Music custom functionality.
  * Version: 0.1
  * Author: Roundhouse Designs
  * Author URI: https://roundhouse-designs.com
@@ -18,7 +18,7 @@ if ( !defined( 'ABSPATH' ) ) {
 }
 
 // Define plugin constants
-define( 'RHD_CSHARP_IMPORTER_VERSION', '1.0.0' );
+define( 'RHD_CSHARP_IMPORTER_VERSION', '0.1' );
 define( 'RHD_CSHARP_IMPORTER_PATH', plugin_dir_path( __FILE__ ) );
 define( 'RHD_CSHARP_IMPORTER_URL', plugin_dir_url( __FILE__ ) );
 
