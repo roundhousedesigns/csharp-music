@@ -32,41 +32,41 @@ class RHD_CSharp_WooCommerce {
 		// Download hooks (removed lazy ZIP creation; bundles now use direct downloads like simple products)
 
 		// Product hooks
-		add_action( 'woocommerce_single_product_summary', [ $this, 'add_custom_product_content' ], 25 );
-		add_filter( 'woocommerce_product_tabs', [ $this, 'customize_product_tabs' ] );
+		add_action( 'woocommerce_single_product_summary', [$this, 'add_custom_product_content'], 25 );
+		add_filter( 'woocommerce_product_tabs', [$this, 'customize_product_tabs'] );
 
 		// Cart hooks
-		add_filter( 'woocommerce_add_to_cart_validation', [ $this, 'validate_add_to_cart' ], 10, 3 );
-		add_action( 'woocommerce_before_calculate_totals', [ $this, 'customize_cart_item_prices' ] );
+		add_filter( 'woocommerce_add_to_cart_validation', [$this, 'validate_add_to_cart'], 10, 3 );
+		add_action( 'woocommerce_before_calculate_totals', [$this, 'customize_cart_item_prices'] );
 
 		// Checkout hooks
-		add_action( 'woocommerce_checkout_process', [ $this, 'validate_checkout_fields' ] );
-		add_action( 'woocommerce_checkout_order_processed', [ $this, 'process_order_completion' ], 10, 3 );
+		add_action( 'woocommerce_checkout_process', [$this, 'validate_checkout_fields'] );
+		add_action( 'woocommerce_checkout_order_processed', [$this, 'process_order_completion'], 10, 3 );
 
 		// Order hooks
-		add_action( 'woocommerce_order_status_completed', [ $this, 'handle_order_completion' ] );
-		add_filter( 'woocommerce_order_item_name', [ $this, 'customize_order_item_name' ], 10, 2 );
+		add_action( 'woocommerce_order_status_completed', [$this, 'handle_order_completion'] );
+		add_filter( 'woocommerce_order_item_name', [$this, 'customize_order_item_name'], 10, 2 );
 
 		// Email hooks
-		add_action( 'woocommerce_email_before_order_table', [ $this, 'add_email_content' ], 10, 4 );
+		add_action( 'woocommerce_email_before_order_table', [$this, 'add_email_content'], 10, 4 );
 
 		// Admin hooks
-		add_filter( 'woocommerce_product_data_tabs', [ $this, 'add_custom_product_data_tab' ] );
-		add_action( 'woocommerce_product_data_panels', [ $this, 'add_custom_product_data_fields' ] );
-		add_action( 'woocommerce_process_product_meta', [ $this, 'save_custom_product_fields' ] );
+		add_filter( 'woocommerce_product_data_tabs', [$this, 'add_custom_product_data_tab'] );
+		add_action( 'woocommerce_product_data_panels', [$this, 'add_custom_product_data_fields'] );
+		add_action( 'woocommerce_process_product_meta', [$this, 'save_custom_product_fields'] );
 
 		// My Account hooks
-		add_filter( 'woocommerce_account_menu_items', [ $this, 'customize_my_account_menu' ] );
-		add_action( 'init', [ $this, 'add_custom_endpoint' ] );
+		add_filter( 'woocommerce_account_menu_items', [$this, 'customize_my_account_menu'] );
+		add_action( 'init', [$this, 'add_custom_endpoint'] );
 
 		// Shop customizations
-		add_action( 'woocommerce_before_shop_loop', [ $this, 'add_shop_content' ] );
-		add_filter( 'woocommerce_loop_product_link', [ $this, 'customize_product_links' ], 10, 2 );
+		add_action( 'woocommerce_before_shop_loop', [$this, 'add_shop_content'] );
+		add_filter( 'woocommerce_loop_product_link', [$this, 'customize_product_links'], 10, 2 );
 
 		// Product block filters - exclude Simple Products from Product blocks
 		// This hides Simple Products from Query Loop blocks and Product blocks in both frontend and editor
-		add_filter( 'query_loop_block_query_vars', [ $this, 'filter_product_blocks_frontend' ], 10, 2 );
-		add_filter( 'rest_product_query', [ $this, 'filter_product_blocks_editor' ], 10, 2 );
+		add_filter( 'query_loop_block_query_vars', [$this, 'filter_product_blocks_frontend'], 10, 2 );
+		add_filter( 'rest_product_query', [$this, 'filter_product_blocks_editor'], 10, 2 );
 	}
 
 	/**
@@ -91,7 +91,7 @@ class RHD_CSharp_WooCommerce {
 		$tabs['music_info'] = [
 			'title'    => __( 'Music Info', 'rhd' ),
 			'priority' => 25,
-			'callback' => [ $this, 'music_info_tab_content' ],
+			'callback' => [$this, 'music_info_tab_content'],
 		];
 
 		return $tabs;
@@ -240,7 +240,7 @@ class RHD_CSharp_WooCommerce {
 	 * Save custom product fields
 	 */
 	public function save_custom_product_fields( $post_id ) {
-		$fields = [ '_rhd_artist', '_rhd_album', '_rhd_duration' ];
+		$fields = ['_rhd_artist', '_rhd_album', '_rhd_duration'];
 
 		foreach ( $fields as $field ) {
 			if ( isset( $_POST[$field] ) ) {

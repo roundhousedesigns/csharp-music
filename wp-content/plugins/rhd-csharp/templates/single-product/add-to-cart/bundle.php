@@ -48,6 +48,25 @@ if ( $base_sku ) {
 ?>
 
 <div class="rhd-sheet-music-bundle">
+
+	<div class="audio-samples">
+		<h3><?php esc_html_e( 'Audio Samples', 'rhd' ); ?></h3>
+		<p class="audio-samples-description">
+			<?php esc_html_e( 'Listen to audio samples of the complete set:', 'rhd' ); ?>
+		</p>
+		<div class="audio-samples-grid">
+			<?php
+			$pod = pods( 'product', $product->get_id() );
+			$audio_files = $pod->field( 'audio_files' );
+			foreach ( $audio_files as $attachment ) {
+				$attachment_url = wp_get_attachment_url( $attachment['ID'] );
+				?>
+				<div class="audio-sample">
+					<audio src="<?php echo esc_url( $attachment_url ); ?>" controls></audio>
+				</div>
+			<?php } ?>
+		</div>
+	</div>
 	
 	<!-- Full Set Option -->
 	<div class="full-set-option">

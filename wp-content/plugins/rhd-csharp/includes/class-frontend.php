@@ -14,7 +14,6 @@ class RHD_CSharp_Frontend {
 
 		// Hide default add-to-cart form for bundle products
 		add_action( 'woocommerce_single_product_summary', [$this, 'maybe_hide_default_add_to_cart'], 5 );
-		add_filter( 'woocommerce_is_purchasable', [$this, 'maybe_hide_purchasable'], 10, 2 );
 	}
 
 	/**
@@ -74,15 +73,5 @@ class RHD_CSharp_Frontend {
 		// where the default add-to-cart form is rendered. By returning early, we prevent
 		// the default form from being output.
 		return;
-	}
-
-	/**
-	 * Filter to prevent purchasing bundle products directly.
-	 */
-	public function maybe_hide_purchasable( $purchasable, $product ) {
-		if ( is_a( $product, 'WC_Product_Bundle' ) ) {
-			return false;
-		}
-		return $purchasable;
 	}
 }
