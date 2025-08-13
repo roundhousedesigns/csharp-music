@@ -10,6 +10,44 @@ class RHD_CSharp_File_Handler {
 	private $file_not_found_errors = [];
 
 	/**
+	 * Cache of directory listings to minimize repeated scandir calls
+	 */
+	private $directory_listing_cache = [];
+
+	/**
+	 * Fast copy: try hardlink or symlink before falling back to copy
+	 */
+	private function fast_copy( $source_path, $destination_path ) {
+		// Ensure destination directory exists
+		$destination_dir = dirname( $destination_path );
+		if ( !file_exists( $destination_dir ) ) {
+			wp_mkdir_p( $destination_dir );
+		}
+
+		// If destination already exists, nothing to do
+		if ( file_exists( $destination_path ) ) {
+			return true;
+		}
+
+		// Try hard link first (fastest, same filesystem required)
+		if ( function_exists( 'link' ) ) {
+			if ( @link( $source_path, $destination_path ) ) {
+				return true;
+			}
+		}
+
+		// Try symlink as a fallback if allowed
+		if ( function_exists( 'symlink' ) ) {
+			if ( @symlink( $source_path, $destination_path ) ) {
+				return true;
+			}
+		}
+
+		// Fallback to copying
+		return copy( $source_path, $destination_path );
+	}
+
+	/**
 	 * Import log file path
 	 */
 	public $log_file_path = null;
@@ -310,8 +348,8 @@ class RHD_CSharp_File_Handler {
 		$unique_filename  = wp_unique_filename( $wc_uploads, $filename );
 		$destination_path = $wc_uploads . '/' . $unique_filename;
 
-		// Copy file to protected location
-		if ( copy( $source_path, $destination_path ) ) {
+		// Copy or link file to protected location
+		if ( $this->fast_copy( $source_path, $destination_path ) ) {
 			// Set up downloadable file for WooCommerce
 			$downloads   = $product->get_downloads();
 			$download_id = md5( $unique_filename );
@@ -371,7 +409,7 @@ class RHD_CSharp_File_Handler {
 		$unique_filename  = wp_unique_filename( $upload_dir['path'], $sanitized_filename );
 		$destination_path = $upload_dir['path'] . '/' . $unique_filename;
 
-		if ( copy( $source_path, $destination_path ) ) {
+		if ( $this->fast_copy( $source_path, $destination_path ) ) {
 			// Create attachment
 			$attachment = [
 				'guid'           => $upload_dir['url'] . '/' . $unique_filename,
@@ -384,9 +422,13 @@ class RHD_CSharp_File_Handler {
 			$attachment_id = wp_insert_attachment( $attachment, $destination_path );
 
 			if ( !is_wp_error( $attachment_id ) ) {
-				// Generate metadata
+				// Generate metadata with sizes disabled to speed up import of large images
 				require_once ABSPATH . 'wp-admin/includes/image.php';
+				add_filter( 'intermediate_image_sizes_advanced', '__return_empty_array', 10, 1 );
+				add_filter( 'big_image_size_threshold', '__return_false', 10, 0 );
 				$attachment_data = wp_generate_attachment_metadata( $attachment_id, $destination_path );
+				remove_filter( 'big_image_size_threshold', '__return_false', 10 );
+				remove_filter( 'intermediate_image_sizes_advanced', '__return_empty_array', 10 );
 				wp_update_attachment_metadata( $attachment_id, $attachment_data );
 
 				// Set as featured image
@@ -404,13 +446,8 @@ class RHD_CSharp_File_Handler {
 	 */
 	public function import_sound_files( $product_id, $filenames_string, $sku = '' ) {
 		if ( empty( $filenames_string ) ) {
-			$this->write_to_log( 'No sound filenames provided; skipping.', 'DEBUG' ) || error_log( 'RHD Import Debug: No sound filenames provided; skipping.' );
+			// $this->write_to_log( 'No sound filenames provided; skipping.', 'DEBUG' ) || error_log( 'RHD Import Debug: No sound filenames provided; skipping.' );
 			return [];
-		}
-
-		// Hint if delimiter seems to be commas instead of semicolons
-		if ( strpos( $filenames_string, ',' ) !== false && strpos( $filenames_string, ';' ) === false ) {
-			$this->write_to_log( 'Sound filenames string appears comma-separated; importer expects semicolons. Raw: ' . $filenames_string, 'DEBUG' ) || error_log( 'RHD Import Debug: Sound filenames string appears comma-separated; importer expects semicolons. Raw: ' . $filenames_string );
 		}
 
 		// Parse semicolon-separated filenames
@@ -442,7 +479,7 @@ class RHD_CSharp_File_Handler {
 
 			if ( !$source_path ) {
 				$stats['missing']++;
-				$this->write_to_log( "Source file not found for '{$filename}' in '{$sound_files_dir}'", 'DEBUG' ) || error_log( "RHD Import Debug: Source file not found for '{$filename}' in '{$sound_files_dir}'" );
+				$this->write_to_log( "Source file not found for '{$filename}' in '{$sound_files_dir}'", 'ERROR' ) || error_log( "RHD Import Debug: Source file not found for '{$filename}' in '{$sound_files_dir}'" );
 				$this->log_file_not_found( $product_id, $sku, $filename, 'sound' );
 				continue;
 			}
@@ -464,7 +501,7 @@ class RHD_CSharp_File_Handler {
 			$unique_filename  = wp_unique_filename( $upload_dir['path'], $sanitized_filename );
 			$destination_path = $upload_dir['path'] . '/' . $unique_filename;
 
-			if ( copy( $source_path, $destination_path ) ) {
+			if ( $this->fast_copy( $source_path, $destination_path ) ) {
 				$attachment = [
 					'guid'           => $upload_dir['url'] . '/' . $unique_filename,
 					'post_mime_type' => wp_check_filetype( $unique_filename )['type'],
@@ -585,7 +622,15 @@ class RHD_CSharp_File_Handler {
 				return false;
 			}
 
-			$folders = scandir( $protected_files_dir );
+			// Use cached listing if available
+			if ( isset( $this->directory_listing_cache[$protected_files_dir] ) ) {
+				$folders = $this->directory_listing_cache[$protected_files_dir];
+			} else {
+				$folders = scandir( $protected_files_dir );
+				if ( is_array( $folders ) ) {
+					$this->directory_listing_cache[$protected_files_dir] = $folders;
+				}
+			}
 
 			if ( false === $folders ) {
 				$this->log_import_error( 'Could not scan protected files directory: ' . $protected_files_dir );
@@ -775,7 +820,15 @@ class RHD_CSharp_File_Handler {
 
 		// If still not found, try case-insensitive search
 		if ( is_dir( $directory ) ) {
-			$files = scandir( $directory );
+			// Use cached listing if available
+			if ( isset( $this->directory_listing_cache[$directory] ) ) {
+				$files = $this->directory_listing_cache[$directory];
+			} else {
+				$files = scandir( $directory );
+				if ( is_array( $files ) ) {
+					$this->directory_listing_cache[$directory] = $files;
+				}
+			}
 			foreach ( $files as $file ) {
 				if ( '.' === $file || '..' === $file ) {
 					continue;

@@ -85,21 +85,6 @@ class RHD_CSharp_WooCommerce {
 	}
 
 	/**
-	 * Content for custom music info tab
-	 */
-	public function music_info_tab_content() {
-		global $product;
-
-		echo '<div class="woocommerce-tabs-panel woocommerce-tabs-panel--music_info panel entry-content wc-tab" id="tab-music_info">';
-		echo '<h2>' . esc_html__( 'Music Information', 'rhd' ) . '</h2>';
-
-		// Add custom music-related information here
-		echo '<p>' . esc_html__( 'Additional music information will be displayed here.', 'rhd' ) . '</p>';
-
-		echo '</div>';
-	}
-
-	/**
 	 * Filter product archive to only show bundled and grouped products
 	 *
 	 * @param  array $tax_query The tax query array
@@ -135,6 +120,7 @@ class RHD_CSharp_WooCommerce {
 
 		$related_products = new WP_Query( [
 			'post_type'      => 'product',
+			'post__not_in'   => [$product_id],
 			'posts_per_page' => $limit,
 			'tax_query'      => [
 				'relation' => 'AND',

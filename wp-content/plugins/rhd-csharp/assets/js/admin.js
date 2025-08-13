@@ -1,3 +1,6 @@
+/* eslint-env browser */
+/* global jQuery, rhdImporter, FormData, setTimeout, alert, document */
+
 jQuery(document).ready(function ($) {
 	"use strict";
 
@@ -64,7 +67,9 @@ jQuery(document).ready(function ($) {
 
 	function processChunks(tempFile, totalRows, updateExisting, logFile) {
 		let currentOffset = 0;
-		const chunkSize = 50; // Process 50 products at a time
+		let chunkSize = 15; // Default smaller chunk size to avoid timeouts
+		const minChunkSize = 5;
+		let retryDelayMs = 500;
 		let totalImported = 0;
 		let totalUpdated = 0;
 		let allErrors = [];
@@ -95,9 +100,11 @@ jQuery(document).ready(function ($) {
 					temp_file: tempFile,
 					log_file: logFile,
 					offset: currentOffset,
-					chunk_size: chunkSize,
+					chunk_size: currentChunkSize,
+					total_rows: totalRows,
 					update_existing: updateExisting ? "1" : "0"
 				},
+				timeout: 120000,
 				success: function(response) {
 					if (response.success) {
 						const data = response.data;
@@ -105,6 +112,7 @@ jQuery(document).ready(function ($) {
 						totalImported += data.results.products_imported;
 						totalUpdated += data.results.products_updated;
 						allErrors = allErrors.concat(data.results.errors);
+						retryDelayMs = 500;
 						
 						// Collect file not found errors
 						if (data.results.file_not_found) {
@@ -119,13 +127,19 @@ jQuery(document).ready(function ($) {
 						);
 
 						// Process next chunk
-						setTimeout(processNextChunk, 100); // Small delay to prevent overwhelming server
+						setTimeout(processNextChunk, 150); // Small delay to prevent overwhelming server
 					} else {
-						showError("Chunk processing failed: " + (response.data || "Unknown error"));
+						// Adaptive backoff: reduce chunk size and retry
+						chunkSize = Math.max(minChunkSize, Math.floor(chunkSize / 2));
+						setTimeout(processNextChunk, retryDelayMs);
+						retryDelayMs = Math.min(5000, retryDelayMs * 2);
 					}
 				},
-				error: function(xhr, status, error) {
-					showError("Import failed: " + error);
+				error: function() {
+					// Adaptive backoff on transport errors/timeouts
+					chunkSize = Math.max(minChunkSize, Math.floor(chunkSize / 2));
+					setTimeout(processNextChunk, retryDelayMs);
+					retryDelayMs = Math.min(5000, retryDelayMs * 2);
 				}
 			});
 		}
@@ -169,7 +183,9 @@ jQuery(document).ready(function ($) {
 
 	function processBundles(bundleDataFile, totalBundles, totalImported, totalUpdated, allErrors, allFileNotFoundErrors, logFile) {
 		let currentOffset = 0;
-		const chunkSize = 5; // Process 5 bundles at a time
+		let chunkSize = 2; // Smaller bundle chunk size to avoid timeouts
+		const minChunkSize = 1;
+		let retryDelayMs = 500;
 		let totalBundlesCreated = 0;
 		let allBundleErrors = [];
 		let allBundleFileErrors = [];
@@ -201,6 +217,7 @@ jQuery(document).ready(function ($) {
 					offset: currentOffset,
 					chunk_size: chunkSize
 				},
+				timeout: 120000,
 				success: function(response) {
 					if (response.success) {
 						const data = response.data;
@@ -229,11 +246,16 @@ jQuery(document).ready(function ($) {
 							setTimeout(processNextBundleChunk, 500); // Small delay between bundle chunks
 						}
 					} else {
-						showError("Bundle creation failed: " + (response.data || "Unknown error"));
+						// Adaptive backoff
+						chunkSize = Math.max(minChunkSize, Math.floor(chunkSize / 2));
+						setTimeout(processNextBundleChunk, retryDelayMs);
+						retryDelayMs = Math.min(5000, retryDelayMs * 2);
 					}
 				},
-				error: function(xhr, status, error) {
-					showError("Bundle creation failed: " + error);
+				error: function() {
+					chunkSize = Math.max(minChunkSize, Math.floor(chunkSize / 2));
+					setTimeout(processNextBundleChunk, retryDelayMs);
+					retryDelayMs = Math.min(5000, retryDelayMs * 2);
 				}
 			});
 		}
@@ -320,7 +342,6 @@ jQuery(document).ready(function ($) {
 		// Add note about ZIP files if bundles were created
 		if (totalBundlesCreated > 0) {
 			errorSection += `<br><div style="background-color: #d1ecf1; border: 1px solid #bee5eb; padding: 10px; margin: 10px 0; border-radius: 4px;">`;
-			errorSection += `<strong>Note:</strong> Bundle ZIP files will be created automatically when customers first download them. This speeds up the import process.`;
 			errorSection += `</div>`;
 		}
 

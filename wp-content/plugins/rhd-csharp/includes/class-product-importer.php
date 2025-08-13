@@ -218,10 +218,10 @@ class RHD_CSharp_Product_Importer {
 						$pod = pods( 'product', $product_id );
 						if ( $update_existing && $pod->field( 'rhd_csharp_importer' ) ) {
 							$results['products_updated']++;
-							$file_handler->log_import_success( "Updated product: {$row['Product ID']}" );
+							// $file_handler->log_import_success( "Updated product: {$row['Product ID']}" );
 						} else {
 							$results['products_imported']++;
-							$file_handler->log_import_success( "Imported product: {$row['Product ID']}" );
+							// $file_handler->log_import_success( "Imported product: {$row['Product ID']}" );
 						}
 					}
 				} catch ( Exception $e ) {

@@ -65,6 +65,10 @@
 	margin-bottom: 1em;
 }
 
+.rhd-accordion-trigger {
+	font-family: var(--wp--preset--font-family--oswald);
+}
+
 .rhd-accordion-trigger .rhd-accordion-trigger-icon {
 	display: inline-block;
 	transform-origin: center;
@@ -152,6 +156,10 @@
 	}
 }
 
-.music_info_tab {
+table.wc-block-cart-items .wc-block-cart-items__row.is-bundled {
 	display: none !important;
+}
+
+.wp-block-woocommerce-product-specifications .wp-block-product-specifications-item p {
+	margin: 0;
 }

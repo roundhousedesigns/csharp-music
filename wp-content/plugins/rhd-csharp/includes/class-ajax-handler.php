@@ -116,7 +116,7 @@ class RHD_CSharp_Ajax_Handler {
 		$temp_file       = sanitize_text_field( $_POST['temp_file'] ?? '' );
 		$log_file        = sanitize_text_field( $_POST['log_file'] ?? '' );
 		$offset          = intval( $_POST['offset'] ?? 0 );
-		$chunk_size      = intval( $_POST['chunk_size'] ?? 50 );
+		$chunk_size      = intval( $_POST['chunk_size'] ?? 15 );
 		$update_existing = isset( $_POST['update_existing'] ) && '1' === $_POST['update_existing'];
 
 		if ( empty( $temp_file ) ) {
@@ -139,11 +139,22 @@ class RHD_CSharp_Ajax_Handler {
 				$file_handler->set_log_file_path( $logs_dir . '/' . $log_file );
 			}
 
-			$csv_data   = $csv_parser->parse( $file_path );
-			$total_rows = count( $csv_data );
+			// Compute total rows once per file to avoid recount and memory usage
+			$total_rows = intval( $_POST['total_rows'] ?? 0 );
+			if ( $total_rows <= 0 ) {
+				$total_rows = 0;
+				if ( ( $handle = fopen( $file_path, 'r' ) ) !== false ) {
+					while ( ( $row = fgetcsv( $handle, 0, ',' ) ) !== false ) {
+						$this->tick_execution_time();
+						$total_rows++;
+					}
+					fclose( $handle );
+				}
+				$total_rows = max( 0, $total_rows - 1 );
+			}
 
-			// Get the chunk of data to process
-			$chunk_data = array_slice( $csv_data, $offset, $chunk_size );
+			// Read only the slice needed
+			$chunk_data = $csv_parser->parse_slice( $file_path, $offset, $chunk_size );
 
 			// Log chunk processing start
 			if ( $offset === 0 ) {
@@ -159,15 +170,6 @@ class RHD_CSharp_Ajax_Handler {
 
 			// Log chunk completion
 			$file_handler->log_phase_complete( "Product Chunk " . floor( $offset / $chunk_size + 1 ), $results );
-
-			// Log phase completion if this is the last chunk
-			if ( $is_complete ) {
-				$file_handler->log_phase_complete( 'Product Import', [
-					'total_processed' => $processed,
-					'products_imported' => $results['products_imported'] ?? 0,
-					'products_updated' => $results['products_updated'] ?? 0
-				] );
-			}
 
 			wp_send_json_success( [
 				'processed'   => $processed,
@@ -267,7 +269,7 @@ class RHD_CSharp_Ajax_Handler {
 		$bundle_data_file = sanitize_text_field( $_POST['bundle_data_file'] ?? '' );
 		$log_file         = sanitize_text_field( $_POST['log_file'] ?? '' );
 		$offset           = intval( $_POST['offset'] ?? 0 );
-		$chunk_size       = intval( $_POST['chunk_size'] ?? 5 ); // Process 5 bundles at a time
+		$chunk_size       = intval( $_POST['chunk_size'] ?? 2 ); // Process 2 bundles at a time to avoid timeouts
 
 		if ( empty( $bundle_data_file ) ) {
 			wp_send_json_error( __( 'No bundle data file specified', 'rhd' ) );
@@ -314,7 +316,7 @@ class RHD_CSharp_Ajax_Handler {
 					$bundle_id = $bundle_creator->create_product_bundle( $base_sku, $family_data, false, $file_handler ); // false = skip ZIP creation
 					if ( $bundle_id ) {
 						$results['bundles_created']++;
-						$file_handler->log_import_success( "Successfully created bundle {$bundle_id} for base SKU: {$base_sku}" );
+						// $file_handler->log_import_success( "Successfully created bundle {$bundle_id} for base SKU: {$base_sku}" );
 					} else {
 						$error_msg = sprintf( __( 'Failed to create bundle for %s', 'rhd' ), $base_sku );
 						$results['errors'][] = $error_msg;
@@ -354,11 +356,11 @@ class RHD_CSharp_Ajax_Handler {
 				] );
 
 				// Log final import summary
-				$summary_data = [
-					'bundles_created' => $results['bundles_created'],
-					'errors' => $results['errors']
-				];
-				$file_handler->log_import_summary( $summary_data );
+				// $summary_data = [
+				// 	'bundles_created' => $results['bundles_created'],
+				// 	'errors' => $results['errors']
+				// ];
+				// $file_handler->log_import_summary( $summary_data );
 			}
 
 			wp_send_json_success( [
