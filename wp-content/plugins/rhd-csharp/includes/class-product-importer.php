@@ -295,7 +295,12 @@ class RHD_CSharp_Product_Importer {
 		$this->set_product_attributes( $product, $data );
 
 		// Add "single instrument" tag for simple products
-		$this->add_product_tag( $product, 'single instrument' );
+		if ( empty( $data['Standalone'] ) ) {
+			$this->add_product_tag( $product, 'individual-single-instrument' );
+		} else {
+			// Make sure the product is not tagged as an individual single instrument
+			$this->remove_product_tag( $product, 'individual-single-instrument' );
+		}
 
 		// Save the product FIRST to get a valid product ID
 		try {
@@ -394,6 +399,7 @@ class RHD_CSharp_Product_Importer {
 			'difficulty'    => $data['Difficulty'] ?? '',
 			'ensemble-type' => $data['Ensemble Type'] ?? '',
 			'instrument'    => $data['Instrumentation'] ?? '',
+			'byline'        => $data['Byline'] ?? '',
 		];
 
 		$this->set_wc_product_attributes( $product, $attribute_config );
@@ -438,14 +444,17 @@ class RHD_CSharp_Product_Importer {
 
 	/**
 	 * Add product tag
+	 *
+	 * @param WC_Product $product  The product object to add the tag to
+	 * @param string     $tag_slug The slug of the tag to add
 	 */
-	private function add_product_tag( $product, $tag_name ) {
+	private function add_product_tag( $product, $tag_slug ) {
 		// Get or create the tag
-		$tag = get_term_by( 'name', $tag_name, 'product_tag' );
+		$tag = get_term_by( 'slug', $tag_slug, 'product_tag' );
 
 		if ( !$tag ) {
 			// Create tag if it doesn't exist
-			$tag_result = wp_insert_term( $tag_name, 'product_tag' );
+			$tag_result = wp_insert_term( $tag_slug, 'product_tag' );
 			if ( !is_wp_error( $tag_result ) ) {
 				$tag_id = $tag_result['term_id'];
 			} else {
@@ -460,6 +469,19 @@ class RHD_CSharp_Product_Importer {
 		if ( !in_array( $tag_id, $existing_tag_ids ) ) {
 			$existing_tag_ids[] = $tag_id;
 			$product->set_tag_ids( $existing_tag_ids );
+		}
+	}
+
+	/**
+	 * Remove product tag
+	 *
+	 * @param WC_Product $product  The product object to remove the tag from
+	 * @param string     $tag_slug The slug of the tag to remove
+	 */
+	private function remove_product_tag( $product, $tag_slug ) {
+		$tag = get_term_by( 'slug', $tag_slug, 'product_tag' );
+		if ( $tag ) {
+			$product->set_tag_ids( array_diff( $product->get_tag_ids(), [$tag->term_id] ) );
 		}
 	}
 

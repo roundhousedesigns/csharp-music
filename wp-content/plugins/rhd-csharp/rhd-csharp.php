@@ -21,6 +21,7 @@ if ( !defined( 'ABSPATH' ) ) {
 define( 'RHD_CSHARP_IMPORTER_VERSION', '0.1' );
 define( 'RHD_CSHARP_IMPORTER_PATH', plugin_dir_path( __FILE__ ) );
 define( 'RHD_CSHARP_IMPORTER_URL', plugin_dir_url( __FILE__ ) );
+define( 'RHD_CSHARP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
 // Autoloader for includes
 spl_autoload_register( function ( $class ) {

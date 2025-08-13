@@ -39,5 +39,8 @@ class RHD_CSharp_Plugin {
 
 		// Initialize WooCommerce customizations
 		new RHD_CSharp_WooCommerce();
+
+		// Initialize shortcodes
+		new RHD_CSharp_Shortcodes();
 	}
 }

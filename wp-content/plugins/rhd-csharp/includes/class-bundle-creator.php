@@ -62,9 +62,6 @@ class RHD_CSharp_Bundle_Creator {
 			$this->set_product_categories( $bundle, $bundle_data['Category'] );
 		}
 
-		// Add "Full Set" tag for bundles
-		$this->add_product_tag( $bundle, 'Full Set' );
-
 		// Update custom meta
 		$this->update_bundle_meta( $bundle, $base_sku, $bundle_data );
 
@@ -111,9 +108,6 @@ class RHD_CSharp_Bundle_Creator {
 		if ( !empty( $bundle_data['Category'] ) ) {
 			$this->set_product_categories( $bundle, $bundle_data['Category'] );
 		}
-
-		// Add "Full Set" tag for bundles
-		$this->add_product_tag( $bundle, 'Full Set' );
 
 		// Set custom meta
 		$this->update_bundle_meta( $bundle, $base_sku, $bundle_data );
@@ -457,13 +451,13 @@ class RHD_CSharp_Bundle_Creator {
 	/**
 	 * Add product tag
 	 */
-	private function add_product_tag( $product, $tag_name ) {
+	private function add_product_tag( $product, $tag_slug ) {
 		// Get or create the tag
-		$tag = get_term_by( 'name', $tag_name, 'product_tag' );
+		$tag = get_term_by( 'slug', $tag_slug, 'product_tag' );
 
 		if ( !$tag ) {
 			// Create tag if it doesn't exist
-			$tag_result = wp_insert_term( $tag_name, 'product_tag' );
+			$tag_result = wp_insert_term( $tag_slug, 'product_tag' );
 			if ( !is_wp_error( $tag_result ) ) {
 				$tag_id = $tag_result['term_id'];
 			} else {

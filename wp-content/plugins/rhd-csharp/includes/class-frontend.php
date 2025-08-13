@@ -9,8 +9,9 @@ class RHD_CSharp_Frontend {
 	 */
 	public function __construct() {
 		// Add custom product template support
-		add_action( 'woocommerce_before_add_to_cart_form', [$this, 'display_custom_bundle_template'] );
+		// add_action( 'woocommerce_before_add_to_cart_form', [$this, 'display_custom_bundle_template'] );
 		add_action( 'wp_enqueue_scripts', [$this, 'enqueue_frontend_scripts'] );
+		add_action( 'wp_enqueue_scripts', [$this, 'enqueue_frontend_styles'] );
 
 		// Hide default add-to-cart form for bundle products
 		add_action( 'woocommerce_single_product_summary', [$this, 'maybe_hide_default_add_to_cart'], 5 );
@@ -41,7 +42,7 @@ class RHD_CSharp_Frontend {
 		if ( is_product() ) {
 			wp_enqueue_script(
 				'rhd-csharp-importer-frontend',
-				RHD_CSHARP_IMPORTER_URL . 'assets/frontend.js',
+				RHD_CSHARP_IMPORTER_URL . 'assets/js/frontend.js',
 				['jquery'],
 				RHD_CSHARP_IMPORTER_VERSION,
 				true
@@ -57,6 +58,13 @@ class RHD_CSharp_Frontend {
 				],
 			] );
 		}
+	}
+
+	/**
+	 * Enqueue frontend styles
+	 */
+	public function enqueue_frontend_styles() {
+		wp_enqueue_style( 'rhd-csharp-importer-frontend', RHD_CSHARP_IMPORTER_URL . 'assets/css/woocommerce.css', [], RHD_CSHARP_IMPORTER_VERSION );
 	}
 
 	/**

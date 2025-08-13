@@ -1,0 +1,157 @@
+/**
+	* WooCommerce Styles
+*/
+
+.rhd-sheet-music-bundle {
+	margin: 2em 0;
+}
+
+.full-set-option,
+.individual-products {
+	margin-bottom: 1em;
+	padding: 1.5em;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	background: #f9f9f9;
+}
+
+.full-set-option h3,
+.individual-products h3,
+.audio-samples h3 {
+	margin: 0;
+	color: #333;
+}
+
+.full-set-option h3 {
+	text-decoration: underline;
+	text-decoration-color: #0073aa;
+	text-decoration-thickness: 2px;
+	text-underline-offset: 4px;
+}
+
+.full-set-option h3 {
+	margin-bottom: 0.5em;
+}
+
+.individual-products h3 {
+	margin: 0;
+}
+
+.individual-products h3 button {
+	font-size: inherit;
+	text-decoration: inherit;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	cursor: pointer;
+	text-align: left;
+	width: 100%;
+	box-shadow: none;
+	outline: none;
+	font-weight: inherit;
+}
+
+.individual-products h3 button:hover {
+	text-decoration: underline;
+	text-decoration-color: #0073aa;
+	text-decoration-thickness: 2px;
+	text-underline-offset: 4px;
+}
+
+.individual-description,
+.audio-samples-description {
+	color: #666;
+	margin-bottom: 1em;
+}
+
+.rhd-accordion-trigger .rhd-accordion-trigger-icon {
+	display: inline-block;
+	transform-origin: center;
+	transition: all 0.2s ease-in-out;
+	position: relative;
+	left: 0;
+	bottom: 0;
+}
+
+.rhd-accordion-trigger.expanded .rhd-accordion-trigger-icon {
+	transform: rotate(90deg);
+	left: 0.3em;
+	bottom: 0.2em;
+}
+
+.full-set-parts {
+	margin-bottom: 1em;
+	columns: 4;
+}
+
+.full-set-part {
+	font-size: var(--wp--preset--font-size--small);
+	line-height: 1.2;
+}
+
+.part-name {
+	font-weight: 500;
+	color: #333;
+}
+
+.individual-products-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+	gap: 1em;
+	margin-top: 1em;
+}
+
+.individual-product {
+	background: white;
+	padding: 1em;
+	border-radius: 3px;
+	border: 1px solid #ddd;
+}
+
+.product-info h4 {
+	margin: 0 0 0.5em 0;
+	font-size: 1em;
+}
+
+.product-price {
+	color: #666;
+	font-weight: 500;
+}
+
+.product-actions {
+	display: flex;
+	justify-content: space-between;
+	gap: 0.5em;
+}
+
+.product-actions p,
+.product-actions br {
+	display: none;
+	/* HACK */
+}
+
+.product-actions a {
+	flex: 1;
+	text-align: center;
+	margin-top: 0 !important;
+}
+
+.audio-samples {
+	margin-top: 1em;
+	margin-bottom: 1em;
+}
+
+.audio-players {
+	display: flex;
+}
+
+@media (max-width: 768px) {
+	.individual-products-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+.music_info_tab {
+	display: none !important;
+}

@@ -36,7 +36,7 @@ class RHD_CSharp_Admin {
 
 		wp_enqueue_script(
 			'rhd-csharp-importer-admin',
-			RHD_CSHARP_IMPORTER_URL . 'assets/admin.js',
+			RHD_CSHARP_IMPORTER_URL . 'assets/js/admin.js',
 			['jquery'],
 			RHD_CSHARP_IMPORTER_VERSION,
 			true
