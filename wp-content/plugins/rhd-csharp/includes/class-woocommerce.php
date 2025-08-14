@@ -111,7 +111,7 @@ class RHD_CSharp_WooCommerce {
 	 * @return array The filtered related products array
 	 */
 	public function filter_related_products( $related_posts, $product_id, $args ) {
-		// TODO Figure out how to intercept the original wc_get_related_products call instead of essentially tossing the results and re-running it afresh here.
+		// TODO Figure out how to intercept the original wc_get_related_products call instead of essentially tossing the results and re-running it afresh here...if that's even possible or worth it.
 
 		$term_slug = 'individual-single-instrument';
 		$limit     = 5;
@@ -173,9 +173,9 @@ class RHD_CSharp_WooCommerce {
 			}
 
 			$query_vars['tax_query'][] = [
-				'taxonomy' => 'product_type',
+				'taxonomy' => 'product_tag',
 				'field'    => 'slug',
-				'terms'    => 'simple',
+				'terms'    => 'individual-single-instrument',
 				'operator' => 'NOT IN',
 			];
 		}
