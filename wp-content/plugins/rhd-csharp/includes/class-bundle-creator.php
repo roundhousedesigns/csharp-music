@@ -6,8 +6,13 @@ class RHD_CSharp_Bundle_Creator {
 
 	/**
 	 * Create product bundle
+	 *
+	 * @param  string                  $base_sku     The base SKU of the bundle
+	 * @param  array                   $family_data  The family data
+	 * @param  RHD_CSharp_File_Handler $file_handler The file handler
+	 * @return int|false               The bundle ID or false if the bundle could not be created
 	 */
-	public function create_product_bundle( $base_sku, $family_data, $create_zip = true, $file_handler = null ) {
+	public function create_product_bundle( $base_sku, $family_data, $file_handler = null ) {
 		// Check if WooCommerce Product Bundles is active
 		if ( !class_exists( 'WC_Product_Bundle' ) ) {
 			return false;
@@ -25,17 +30,17 @@ class RHD_CSharp_Bundle_Creator {
 
 		if ( $existing_bundle_id ) {
 			// Update existing bundle
-			return $this->update_existing_bundle( $existing_bundle_id, $base_sku, $bundle_data, $family_data, $create_zip, $file_handler );
+			return $this->update_existing_bundle( $existing_bundle_id, $base_sku, $bundle_data, $family_data, $file_handler );
 		}
 
 		// Create new bundle
-		return $this->create_new_bundle( $base_sku, $bundle_data, $family_data, $create_zip, $file_handler );
+		return $this->create_new_bundle( $base_sku, $bundle_data, $family_data, $file_handler );
 	}
 
 	/**
 	 * Update existing bundle
 	 */
-	private function update_existing_bundle( $bundle_id, $base_sku, $bundle_data, $family_data, $create_zip = true, $file_handler = null ) {
+	private function update_existing_bundle( $bundle_id, $base_sku, $bundle_data, $family_data, $file_handler = null ) {
 		$bundle = wc_get_product( $bundle_id );
 		if ( !$bundle || !is_a( $bundle, 'WC_Product_Bundle' ) ) {
 			return false;
@@ -67,7 +72,7 @@ class RHD_CSharp_Bundle_Creator {
 
 		$bundle->save();
 
-		// Import bundle files: attach direct product file and image (no ZIP creation)
+		// Import bundle files: attach direct product file and image
 		if ( !$file_handler ) {
 			$file_handler = new RHD_CSharp_File_Handler();
 		}
@@ -81,8 +86,14 @@ class RHD_CSharp_Bundle_Creator {
 
 	/**
 	 * Create new bundle
+	 *
+	 * @param  string                  $base_sku     The base SKU of the bundle
+	 * @param  array                   $bundle_data  The bundle data
+	 * @param  array                   $family_data  The family data
+	 * @param  RHD_CSharp_File_Handler $file_handler The file handler
+	 * @return int|false               The bundle ID or false if the bundle could not be created
 	 */
-	private function create_new_bundle( $base_sku, $bundle_data, $family_data, $create_zip = true, $file_handler = null ) {
+	private function create_new_bundle( $base_sku, $bundle_data, $family_data, $file_handler = null ) {
 		$bundle_title = $bundle_data['Product Title'] ?? '';
 		$bundle_title = preg_replace( '/\s*-\s*Full Set$/i', '', $bundle_title );
 
@@ -114,7 +125,7 @@ class RHD_CSharp_Bundle_Creator {
 
 		$bundle_id = $bundle->save();
 
-		// Import and associate product files: attach direct product file and image (no ZIP creation)
+		// Import and associate product files: attach direct product file and image
 		if ( $bundle_id ) {
 			if ( !$file_handler ) {
 				$file_handler = new RHD_CSharp_File_Handler();

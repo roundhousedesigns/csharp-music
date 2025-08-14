@@ -217,4 +217,48 @@ class RHD_CSharp_WooCommerce {
 		return $product && $product->is_downloadable();
 	}
 
+	/**
+	 * Get individual products for a bundle product
+	 *
+	 * @param  int          $product_id The product ID
+	 * @return WC_Product[] The individual products array
+	 */
+	public static function get_bundled_products( $product_id ) {
+		$product = wc_get_product( $product_id );
+
+		// Get bundled items using the proper API
+		$bundled_items     = $product->get_bundled_data_items();
+		$has_bundled_items = !empty( $bundled_items );
+
+		if ( !$has_bundled_items ) {
+			return;
+		}
+
+		// Get individual products for this bundle
+		$base_sku            = $product->get_meta( '_bundle_base_sku' );
+		$individual_products = [];
+
+		if ( $base_sku ) {
+			global $wpdb;
+			$like_pattern = $wpdb->esc_like( $base_sku ) . '%';
+			$product_ids  = $wpdb->get_col( $wpdb->prepare(
+				"SELECT post_id FROM {$wpdb->postmeta}
+		WHERE meta_key = '_sku'
+		AND meta_value LIKE %s
+		AND meta_value != %s",
+				$like_pattern,
+				$base_sku
+			) );
+
+			foreach ( $product_ids as $product_id ) {
+				$individual_product = wc_get_product( $product_id );
+				if ( $individual_product ) {
+					$individual_products[] = $individual_product;
+				}
+			}
+		}
+
+		return $individual_products;
+	}
+
 }

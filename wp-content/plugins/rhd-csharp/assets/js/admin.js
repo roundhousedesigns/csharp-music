@@ -339,7 +339,7 @@ jQuery(document).ready(function ($) {
 			errorSection += "</ul>";
 		}
 
-		// Add note about ZIP files if bundles were created
+		// Add note if bundles were created
 		if (totalBundlesCreated > 0) {
 			errorSection += `<br><div style="background-color: #d1ecf1; border: 1px solid #bee5eb; padding: 10px; margin: 10px 0; border-radius: 4px;">`;
 			errorSection += `</div>`;

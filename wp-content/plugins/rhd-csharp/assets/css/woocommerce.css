@@ -163,3 +163,18 @@ table.wc-block-cart-items .wc-block-cart-items__row.is-bundled {
 .wp-block-woocommerce-product-specifications .wp-block-product-specifications-item p {
 	margin: 0;
 }
+
+.rhd-bundle-instrumentation {
+	max-width: 500px;
+}
+
+.rhd-bundle-instrumentation-title {
+	margin-bottom: 0;
+}
+
+.rhd-bundle-instrumentation-list {
+	list-style: none;
+	padding: 0;
+	columns: 3 auto;
+	font-size: var(--wp--preset--font-size--small);
+}

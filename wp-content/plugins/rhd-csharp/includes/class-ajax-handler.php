@@ -63,7 +63,7 @@ class RHD_CSharp_Ajax_Handler {
 
 		try {
 			// Initialize logging
-			$file_handler = new RHD_CSharp_File_Handler();
+			$file_handler  = new RHD_CSharp_File_Handler();
 			$log_file_path = $file_handler->init_import_log();
 			$file_handler->log_phase_start( 'CSV Analysis' );
 
@@ -78,8 +78,8 @@ class RHD_CSharp_Ajax_Handler {
 			}
 
 			$file_handler->log_phase_complete( 'CSV Analysis', [
-				'total_rows' => $total_rows,
-				'products_to_import' => max( 0, $total_rows - 1 )
+				'total_rows'         => $total_rows,
+				'products_to_import' => max( 0, $total_rows - 1 ),
 			] );
 
 			// Store file temporarily for chunked processing
@@ -157,7 +157,7 @@ class RHD_CSharp_Ajax_Handler {
 			$chunk_data = $csv_parser->parse_slice( $file_path, $offset, $chunk_size );
 
 			// Log chunk processing start
-			if ( $offset === 0 ) {
+			if ( 0 === $offset ) {
 				$file_handler->log_phase_start( 'Product Import', $total_rows );
 			}
 			$file_handler->write_to_log( "Processing chunk: offset {$offset}, size " . count( $chunk_data ) );
@@ -169,7 +169,7 @@ class RHD_CSharp_Ajax_Handler {
 			$is_complete = $processed >= $total_rows;
 
 			// Log chunk completion
-			$file_handler->log_phase_complete( "Product Chunk " . floor( $offset / $chunk_size + 1 ), $results );
+			$file_handler->log_phase_complete( 'Product Chunk ' . floor( $offset / $chunk_size + 1 ), $results );
 
 			wp_send_json_success( [
 				'processed'   => $processed,
@@ -225,8 +225,8 @@ class RHD_CSharp_Ajax_Handler {
 			$bundle_families = $bundle_creator->prepare_bundle_families( $file_path );
 
 			$file_handler->log_phase_complete( 'Bundle Preparation', [
-				'families_found' => count( $bundle_families ),
-				'bundles_to_create' => count( $bundle_families )
+				'families_found'    => count( $bundle_families ),
+				'bundles_to_create' => count( $bundle_families ),
 			] );
 
 			// Store bundle families data for chunked processing
@@ -234,14 +234,14 @@ class RHD_CSharp_Ajax_Handler {
 			file_put_contents( $bundle_data_file, json_encode( $bundle_families ) );
 
 			wp_send_json_success( [
-				'message' => __( 'Products imported successfully', 'rhd' ),
+				'message'          => __( 'Products imported successfully', 'rhd' ),
 				'bundle_data_file' => basename( $bundle_data_file ),
-				'log_file' => $file_handler->get_log_filename(),
-				'total_bundles' => count( $bundle_families ),
-				'results' => [
+				'log_file'         => $file_handler->get_log_filename(),
+				'total_bundles'    => count( $bundle_families ),
+				'results'          => [
 					'bundles_prepared' => count( $bundle_families ),
-					'errors' => []
-				]
+					'errors'           => [],
+				],
 			] );
 
 		} catch ( Exception $e ) {
@@ -289,21 +289,21 @@ class RHD_CSharp_Ajax_Handler {
 			}
 
 			$bundle_families = json_decode( file_get_contents( $file_path ), true );
-			$total_bundles = count( $bundle_families );
+			$total_bundles   = count( $bundle_families );
 
 			// Get chunk of bundle families to process
 			$families_chunk = array_slice( $bundle_families, $offset, $chunk_size, true );
 
 			$bundle_creator = new RHD_CSharp_Bundle_Creator();
-			
+
 			$results = [
 				'bundles_created' => 0,
-				'errors' => [],
-				'file_not_found' => []
+				'errors'          => [],
+				'file_not_found'  => [],
 			];
 
 			// Log bundle processing start
-			if ( $offset === 0 ) {
+			if ( 0 === $offset ) {
 				$file_handler->log_phase_start( 'Bundle Creation', $total_bundles );
 			}
 			$file_handler->write_to_log( "Processing bundle chunk: offset {$offset}, size " . count( $families_chunk ) );
@@ -313,17 +313,17 @@ class RHD_CSharp_Ajax_Handler {
 				$this->tick_execution_time();
 				try {
 					$file_handler->write_to_log( "Creating bundle for base SKU: {$base_sku}" );
-					$bundle_id = $bundle_creator->create_product_bundle( $base_sku, $family_data, false, $file_handler ); // false = skip ZIP creation
+					$bundle_id = $bundle_creator->create_product_bundle( $base_sku, $family_data, $file_handler );
 					if ( $bundle_id ) {
 						$results['bundles_created']++;
 						// $file_handler->log_import_success( "Successfully created bundle {$bundle_id} for base SKU: {$base_sku}" );
 					} else {
-						$error_msg = sprintf( __( 'Failed to create bundle for %s', 'rhd' ), $base_sku );
+						$error_msg           = sprintf( __( 'Failed to create bundle for %s', 'rhd' ), $base_sku );
 						$results['errors'][] = $error_msg;
 						$file_handler->log_import_error( $error_msg, 'Bundle Creation' );
 					}
 				} catch ( Exception $e ) {
-					$error_msg = sprintf( __( 'Error creating bundle for %s: %s', 'rhd' ), $base_sku, $e->getMessage() );
+					$error_msg           = sprintf( __( 'Error creating bundle for %s: %s', 'rhd' ), $base_sku, $e->getMessage() );
 					$results['errors'][] = $error_msg;
 					$file_handler->log_import_error( $error_msg, 'Bundle Creation' );
 				}
@@ -341,18 +341,18 @@ class RHD_CSharp_Ajax_Handler {
 				);
 			}
 
-			$processed = $offset + count( $families_chunk );
+			$processed   = $offset + count( $families_chunk );
 			$is_complete = $processed >= $total_bundles;
 
 			// Log chunk completion
-			$file_handler->log_phase_complete( "Bundle Chunk " . floor( $offset / $chunk_size + 1 ), $results );
+			$file_handler->log_phase_complete( 'Bundle Chunk ' . floor( $offset / $chunk_size + 1 ), $results );
 
 			// Clean up bundle data file and log final summary if we're done
 			if ( $is_complete ) {
 				unlink( $file_path );
 				$file_handler->log_phase_complete( 'Bundle Creation', [
 					'total_processed' => $processed,
-					'bundles_created' => $results['bundles_created']
+					'bundles_created' => $results['bundles_created'],
 				] );
 
 				// Log final import summary
@@ -364,11 +364,11 @@ class RHD_CSharp_Ajax_Handler {
 			}
 
 			wp_send_json_success( [
-				'processed' => $processed,
-				'total' => $total_bundles,
+				'processed'   => $processed,
+				'total'       => $total_bundles,
 				'is_complete' => $is_complete,
-				'results' => $results,
-				'message' => sprintf( __( 'Processed %d of %d bundles', 'rhd' ), $processed, $total_bundles )
+				'results'     => $results,
+				'message'     => sprintf( __( 'Processed %d of %d bundles', 'rhd' ), $processed, $total_bundles ),
 			] );
 
 		} catch ( Exception $e ) {
