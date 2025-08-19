@@ -77,3 +77,7 @@ Thumbs.db
 
 # Plugins and Themes
 !wp-content/plugins/rhd-csharp
+
+
+#Ignore cursor AI rules
+.cursor/rules/codacy.mdc
