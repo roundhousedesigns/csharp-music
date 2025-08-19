@@ -12,9 +12,9 @@ defined( 'ABSPATH' ) || exit;
 global $product;
 
 $individual_products = RHD_CSharp_Woocommerce::get_bundled_products( $product->get_id() );
-$instruments = array_map( function( $product ) {
+$instruments = array_unique( array_map( function( $product ) {
 	return $product->get_attribute( 'instrument' );
-}, $individual_products );
+}, $individual_products ) );
 ?>
 
 <div class="rhd-bundle-instrumentation">

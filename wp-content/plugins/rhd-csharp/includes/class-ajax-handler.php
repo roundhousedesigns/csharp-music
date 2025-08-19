@@ -222,9 +222,7 @@ class RHD_CSharp_Ajax_Handler {
 			$file_handler->log_phase_start( 'Bundle Preparation' );
 
 			// Prepare bundle creation data instead of creating all bundles
-			error_log( 'RHD AJAX Debug: Calling prepare_bundle_families with file: ' . $file_path );
 			$bundle_families = $bundle_creator->prepare_bundle_families( $file_path );
-			error_log( 'RHD AJAX Debug: prepare_bundle_families returned ' . count( $bundle_families ) . ' families' );
 
 			$file_handler->log_phase_complete( 'Bundle Preparation', [
 				'families_found'    => count( $bundle_families ),
@@ -316,10 +314,6 @@ class RHD_CSharp_Ajax_Handler {
 			foreach ( $families_chunk as $base_sku => $family_data ) {
 				$this->tick_execution_time();
 				$bundle_id = null;
-				
-				error_log( 'RHD AJAX Debug: Processing family ' . $base_sku . ' with ' . count( $family_data['products'] ?? [] ) . ' products' );
-				error_log( 'RHD AJAX Debug: Has full_set_data: ' . ( isset( $family_data['full_set_data'] ) ? 'yes' : 'no' ) );
-				error_log( 'RHD AJAX Debug: Has hardcopy_data: ' . ( isset( $family_data['hardcopy_data'] ) ? 'yes' : 'no' ) );
 				
 				// Create digital bundle if we have full set digital data
 				if ( isset( $family_data['full_set_data'] ) && isset( $family_data['products'] ) && count( $family_data['products'] ) > 0 ) {

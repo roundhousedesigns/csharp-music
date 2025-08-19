@@ -236,8 +236,7 @@ class RHD_CSharp_File_Handler {
 		if ( $this->log_file_path && file_exists( dirname( $this->log_file_path ) ) ) {
 			$this->write_to_log( $message, 'ERROR' );
 		} else {
-			// Fallback to WordPress error log
-			error_log( "RHD Import File Error: {$message}" );
+			// No file log available; silently skip global error_log
 		}
 	}
 
@@ -446,7 +445,7 @@ class RHD_CSharp_File_Handler {
 	 */
 	public function import_sound_files( $product_id, $filenames_string, $sku = '' ) {
 		if ( empty( $filenames_string ) ) {
-			// $this->write_to_log( 'No sound filenames provided; skipping.', 'DEBUG' ) || error_log( 'RHD Import Debug: No sound filenames provided; skipping.' );
+			$this->write_to_log( 'No sound filenames provided; skipping.', 'DEBUG' ) || error_log( 'RHD Import Debug: No sound filenames provided; skipping.' );
 			return [];
 		}
 
@@ -479,7 +478,7 @@ class RHD_CSharp_File_Handler {
 
 			if ( !$source_path ) {
 				$stats['missing']++;
-				$this->write_to_log( "Source file not found for '{$filename}' in '{$sound_files_dir}'", 'ERROR' ) || error_log( "RHD Import Debug: Source file not found for '{$filename}' in '{$sound_files_dir}'" );
+				$this->write_to_log( "Source file not found for '{$filename}' in '{$sound_files_dir}'", 'ERROR' );
 				$this->log_file_not_found( $product_id, $sku, $filename, 'sound' );
 				continue;
 			}
@@ -671,9 +670,6 @@ class RHD_CSharp_File_Handler {
 			$file_path = $this->find_file_in_directory( $project_folder, $filename );
 			if ( $file_path ) {
 				return $file_path;
-			} else {
-				error_log( 'File not found in project folder: ' . $filename );
-				error_log( 'Project folder: ' . $project_folder );
 			}
 		}
 

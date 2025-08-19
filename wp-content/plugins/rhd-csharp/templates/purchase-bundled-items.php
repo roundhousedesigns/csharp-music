@@ -19,7 +19,7 @@ $individual_products = RHD_CSharp_Woocommerce::get_bundled_products( $product->g
 	<?php if ( !empty( $individual_products ) ): ?>
 		<?php $accordion_id = 'rhd-acc-' . uniqid(); ?>
 		<div class="individual-products rhd-accordion" data-accordion="rhd-sheet-music-bundle">
-			<h3 class="rhd-accordion-header"><button class="rhd-accordion-trigger" type="button" aria-expanded="false" aria-controls="<?php echo esc_attr( $accordion_id ); ?>"><?php esc_html_e( 'Purchase Individual Parts', 'rhd' ); ?><span class="rhd-accordion-trigger-icon">&nbsp;&nbsp;&rsaquo;</span></button></h3>
+			<h3 class="rhd-accordion-header"><button class="rhd-accordion-trigger" type="button" aria-expanded="false" aria-controls="<?php echo esc_attr( $accordion_id ); ?>"><?php esc_html_e( sprintf( 'Purchase Individual Parts (%s)', $product->is_downloadable() ? 'Digital' : 'Hardcopy' ), 'rhd' ); ?><span class="rhd-accordion-trigger-icon">&nbsp;&nbsp;&rsaquo;</span></button></h3>
 			<div id="<?php echo esc_attr( $accordion_id ); ?>" class="rhd-accordion-panel" hidden>
 				<p class="individual-description">
 					<?php esc_html_e( 'Purchase single instrument charts below:', 'rhd' ); ?>

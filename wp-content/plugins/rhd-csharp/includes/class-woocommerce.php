@@ -51,6 +51,15 @@ class RHD_CSharp_WooCommerce {
 		remove_action( 'woocommerce_bundled_item_details', 'wc_pb_template_bundled_item_product_details', 25 );
 		remove_action( 'woocommerce_bundled_item_details', 'wc_pb_template_bundled_item_details_close', 30 );
 		remove_action( 'woocommerce_bundled_item_details', 'wc_pb_template_bundled_item_details_wrapper_close', 100 );
+
+		// Templates
+		// Override Template Parts
+		add_filter( 'wc_get_template_part', [$this, 'override_woocommerce_template_part'], 10, 3 );
+		// Override Templates
+		add_filter( 'woocommerce_locate_template', [$this, 'override_woocommerce_template'], 10, 3 );
+
+		// Product titles
+		add_filter( 'woocommerce_product_title', [$this, 'filter_add_to_cart_title'], 10, 2 );
 	}
 
 	/**
@@ -91,11 +100,16 @@ class RHD_CSharp_WooCommerce {
 	 * @return array The filtered tax query array
 	 */
 	public function filter_product_archive( $tax_query ) {
-		$term_slug   = 'individual-single-instrument';
 		$tax_query[] = [
 			'taxonomy' => 'product_tag',
 			'field'    => 'slug',
-			'terms'    => $term_slug,
+			'terms'    => 'individual-single-instrument',
+			'operator' => 'NOT IN',
+		];
+		$tax_query[] = [
+			'taxonomy' => 'product_type',
+			'field'    => 'slug',
+			'terms'    => 'bundle',
 			'operator' => 'NOT IN',
 		];
 
@@ -136,6 +150,12 @@ class RHD_CSharp_WooCommerce {
 					'terms'    => $product_cats,
 					'operator' => 'IN',
 				],
+				[
+					'taxonomy' => 'product_type',
+					'field'    => 'slug',
+					'terms'    => 'bundle',
+					'operator' => 'NOT IN',
+				],
 			],
 		] );
 
@@ -158,6 +178,7 @@ class RHD_CSharp_WooCommerce {
 				'operator' => 'NOT IN',
 			];
 		}
+
 		return $query;
 	}
 
@@ -178,6 +199,12 @@ class RHD_CSharp_WooCommerce {
 				'terms'    => 'individual-single-instrument',
 				'operator' => 'NOT IN',
 			];
+			$query_vars['tax_query'][] = [
+				'taxonomy' => 'product_type',
+				'field'    => 'slug',
+				'terms'    => 'bundle',
+				'operator' => 'NOT IN',
+			];
 		}
 
 		return $query_vars;
@@ -186,6 +213,7 @@ class RHD_CSharp_WooCommerce {
 	/**
 	 * Filter Product blocks in editor - exclude Simple Products
 	 */
+	// TODO need this??
 	public function filter_product_blocks_editor( $args, $request ) {
 		// Add tax_query to exclude Simple Products
 		if ( !isset( $args['tax_query'] ) ) {
@@ -239,32 +267,9 @@ class RHD_CSharp_WooCommerce {
 			return [];
 		}
 
-		// Get individual products for this bundle
-		$base_sku            = $product->get_meta( '_bundle_base_sku' );
-		$individual_products = [];
-
-		if ( $base_sku ) {
-			global $wpdb;
-			$like_pattern = $wpdb->esc_like( $base_sku ) . '%';
-			$product_ids  = $wpdb->get_col( $wpdb->prepare(
-				"SELECT post_id FROM {$wpdb->postmeta}
-		WHERE meta_key = '_sku'
-		AND meta_value LIKE %s
-		AND meta_value != %s",
-				$like_pattern,
-				$base_sku
-			) );
-
-			foreach ( $product_ids as $product_id ) {
-				$individual_product = wc_get_product( $product_id );
-				if ( $individual_product ) {
-					$individual_products[] = $individual_product;
-				}
-			}
-		}
-
-		// Sort products by ensemble type and instrument order
-		return self::sort_products_by_ensemble_order( $individual_products );
+		return array_map( function ( $item ) {
+			return wc_get_product( $item->get_product_id() );
+		}, $bundled_items );
 	}
 
 	/**
@@ -281,9 +286,16 @@ class RHD_CSharp_WooCommerce {
 		// Define instrument order for each ensemble type
 		$ensemble_orders = [
 			'CONCERT BAND'           => [
-				'Piccolo', 'Flutes', 'Oboe', 'Bassoon', 'Eb Clarinet', 'Clarinets', 'Alto Clarinet',
-				'Bass Clarinet', 'Contralto Clarinet', 'Contrabass Clarinet', 'Alto Saxes', 'Tenor Sax',
-				'Baritone Sax', 'Trumpets', 'French Horns', 'Trombones', 'Baritone/Euphonium',
+				'Piccolo', 'Flute 1', 'Flute 2', 'Flute 3', 'Oboe', 'Bassoon', 'Eb Clarinet', 'Clarinet 1', 'Clarinet 2', 'Clarinet 3', 'Alto Clarinet',
+				'Bass Clarinet', 'Contralto Clarinet', 'Contrabass Clarinet', 'Alto Sax 1', 'Alto Sax 2', 'Alto Sax 3', 'Tenor Sax',
+				'Baritone Sax', 'Trumpet 1', 'Trumpet 2', 'Trumpet 3', 'French Horn 1', 'French Horn 2', 'French Horn 3', 'Trombone 1', 'Trombone 2', 'Trombone 3', 'Baritone/Euphonium',
+				'Baritone/Euphonium TC', 'Tuba', 'Bells', 'Xylophone', 'Vibraphone', 'Marimba',
+				'Percussion', 'Cymbals', 'Snare/Bass Drum', 'Timpani', 'Piano',
+			],
+			'WIND BAND'              => [
+				'Piccolo', 'Flute 1', 'Flute 2', 'Flute 3', 'Oboe', 'Bassoon', 'Eb Clarinet', 'Clarinet 1', 'Clarinet 2', 'Clarinet 3', 'Alto Clarinet',
+				'Bass Clarinet', 'Contralto Clarinet', 'Contrabass Clarinet', 'Alto Sax 1', 'Alto Sax 2', 'Alto Sax 3', 'Tenor Sax',
+				'Baritone Sax', 'Trumpet 1', 'Trumpet 2', 'Trumpet 3', 'French Horn 1', 'French Horn 2', 'French Horn 3', 'Trombone 1', 'Trombone 2', 'Trombone 3', 'Baritone/Euphonium',
 				'Baritone/Euphonium TC', 'Tuba', 'Bells', 'Xylophone', 'Vibraphone', 'Marimba',
 				'Percussion', 'Cymbals', 'Snare/Bass Drum', 'Timpani', 'Piano',
 			],
@@ -323,7 +335,7 @@ class RHD_CSharp_WooCommerce {
 		}
 
 		// Get the order array for this ensemble type
-		$instrument_order = $ensemble_orders[$ensemble_type] ?? [];
+		$instrument_order = $ensemble_orders[strtoupper( $ensemble_type )] ?? [];
 
 		// If no specific order found, return products as-is
 		if ( empty( $instrument_order ) ) {
@@ -344,7 +356,62 @@ class RHD_CSharp_WooCommerce {
 			return $order_a - $order_b;
 		} );
 
-		return $products;
+		return array_values( $products );
 	}
 
+	public static function filter_grouped_product_title( $title, $product ) {
+		if ( 'bundle' !== $product->get_type() && !has_term( 'individual-single-instrument', 'product_tag', $product->get_id() ) ) {
+			return $title;
+		}
+
+		$medium_text = $product->is_downloadable() ? 'Digital' : 'Hardcopy';
+
+		return sprintf( '%s - %s', $title, $medium_text );
+	}
+
+	/**
+	 * Filter the Add to Cart block title for bundle products
+	 *
+	 * @param  string     $parent_title_data The parent title data
+	 * @param  WC_Product $that              The product object
+	 * @return string     The filtered title
+	 */
+	public function filter_add_to_cart_title( $parent_title_data, $that ) {
+		$title = $parent_title_data;
+
+		return self::filter_grouped_product_title( $title, $that );
+	}
+
+	/**
+	 * Override WooCommerce template parts
+	 *
+	 * @param  string $template Default template file path.
+	 * @param  string $slug     Template file slug.
+	 * @param  string $name     Template file name.
+	 * @return string Return the template part from plugin.
+	 */
+	public function override_woocommerce_template_part( $template, $slug, $name ) {
+		$template_directory = untrailingslashit( RHD_CSHARP_PLUGIN_DIR ) . '/templates/woocommerce/';
+		if ( $name ) {
+			$path = $template_directory . "{$slug}-{$name}.php";
+		} else {
+			$path = $template_directory . "{$slug}.php";
+		}
+		return file_exists( $path ) ? $path : $template;
+	}
+
+	/**
+	 * Override WooCommerce templates
+	 *
+	 * @param  string $template      Default template file path.
+	 * @param  string $template_name Template file name.
+	 * @param  string $template_path Template file directory file path.
+	 * @return string Return the template file from plugin.
+	 */
+	public function override_woocommerce_template( $template, $template_name, $template_path ) {
+		$template_directory = untrailingslashit( RHD_CSHARP_PLUGIN_DIR ) . '/templates/woocommerce/';
+		$path               = $template_directory . $template_name;
+
+		return file_exists( $path ) ? $path : $template;
+	}
 }

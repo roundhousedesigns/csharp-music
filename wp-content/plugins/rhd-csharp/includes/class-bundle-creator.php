@@ -178,6 +178,9 @@ class RHD_CSharp_Bundle_Creator {
 			return false;
 		}
 
+		// Determine bundle type to filter singles appropriately (digital vs hardcopy)
+		$is_digital_bundle = $bundle->is_downloadable();
+
 		// Clear existing bundled items for this bundle by setting empty array
 		$bundle->set_bundled_data_items( [] );
 
@@ -190,6 +193,16 @@ class RHD_CSharp_Bundle_Creator {
 			// Get the product to verify it exists and get its SKU
 			$product = wc_get_product( $product_id );
 			if ( !$product ) {
+				continue;
+			}
+
+			// Filter by SKU suffix: -D for digital singles; no -D for hardcopy singles
+			$single_sku      = $product->get_sku();
+			$single_sku_is_d = is_string( $single_sku ) && preg_match( '/-D$/i', $single_sku );
+			if ( $is_digital_bundle && !$single_sku_is_d ) {
+				continue;
+			}
+			if ( !$is_digital_bundle && $single_sku_is_d ) {
 				continue;
 			}
 
@@ -325,18 +338,15 @@ class RHD_CSharp_Bundle_Creator {
 			// Create digital bundle if we have full set digital data
 			if ( $family_data['full_set_data'] && count( $family_data['products'] ) > 0 ) {
 				try {
-					error_log( 'RHD Import: Creating bundle for base SKU: ' . $base_sku );
 					$bundle_id = $this->create_product_bundle( $base_sku, $family_data );
 					if ( $bundle_id ) {
 						$results['bundles_created']++;
-						error_log( 'RHD Import: Successfully created bundle ' . $bundle_id . ' for base SKU: ' . $base_sku );
 					} else {
 						$error_msg = sprintf(
 							__( 'Failed to create bundle for %s: Unknown error', 'rhd' ),
 							$base_sku
 						);
 						$results['errors'][] = $error_msg;
-						error_log( 'RHD Import: ' . $error_msg );
 					}
 				} catch ( Exception $e ) {
 					$error_msg = sprintf(
@@ -345,7 +355,6 @@ class RHD_CSharp_Bundle_Creator {
 						$e->getMessage()
 					);
 					$results['errors'][] = $error_msg;
-					error_log( 'RHD Import: Exception creating bundle for ' . $base_sku . ': ' . $e->getMessage() );
 				} catch ( Error $e ) {
 					$error_msg = sprintf(
 						__( 'Fatal error creating bundle for %s: %s', 'rhd' ),
@@ -353,25 +362,21 @@ class RHD_CSharp_Bundle_Creator {
 						$e->getMessage()
 					);
 					$results['errors'][] = $error_msg;
-					error_log( 'RHD Import: Fatal error creating bundle for ' . $base_sku . ': ' . $e->getMessage() );
 				}
 			}
 
 			// Create grouped product if we have either digital bundle or hardcopy data
 			if ( $bundle_id || $family_data['hardcopy_data'] ) {
 				try {
-					error_log( 'RHD Import: Creating grouped product for base SKU: ' . $base_sku );
 					$grouped_id = $grouped_product_creator->create_grouped_product( $base_sku, $family_data, $bundle_id );
 					if ( $grouped_id ) {
 						$results['grouped_products_created']++;
-						error_log( 'RHD Import: Successfully created grouped product ' . $grouped_id . ' for base SKU: ' . $base_sku );
 					} else {
 						$error_msg = sprintf(
 							__( 'Failed to create grouped product for %s: Unknown error', 'rhd' ),
 							$base_sku
 						);
 						$results['errors'][] = $error_msg;
-						error_log( 'RHD Import: ' . $error_msg );
 					}
 				} catch ( Exception $e ) {
 					$error_msg = sprintf(
@@ -380,7 +385,6 @@ class RHD_CSharp_Bundle_Creator {
 						$e->getMessage()
 					);
 					$results['errors'][] = $error_msg;
-					error_log( 'RHD Import: Exception creating grouped product for ' . $base_sku . ': ' . $e->getMessage() );
 				} catch ( Error $e ) {
 					$error_msg = sprintf(
 						__( 'Fatal error creating grouped product for %s: %s', 'rhd' ),
@@ -388,7 +392,6 @@ class RHD_CSharp_Bundle_Creator {
 						$e->getMessage()
 					);
 					$results['errors'][] = $error_msg;
-					error_log( 'RHD Import: Fatal error creating grouped product for ' . $base_sku . ': ' . $e->getMessage() );
 				}
 			}
 		}
@@ -404,7 +407,7 @@ class RHD_CSharp_Bundle_Creator {
 
 		// Parse CSV to rebuild product families
 		$csv_data = $csv_parser->parse( $file_path );
-		error_log( 'RHD Bundle Debug: CSV parsed, found ' . count( $csv_data ) . ' rows' );
+		// Debug removed
 
 		$product_families = [];
 
@@ -420,24 +423,19 @@ class RHD_CSharp_Bundle_Creator {
 
 			// Debug: Show available fields for first few rows
 			if ( $individual_products_found < 3 ) {
-				error_log( 'RHD Bundle Debug: Available CSV fields for ' . $row['Product ID'] . ': ' . implode( ', ', array_keys( $row ) ) );
-				error_log( 'RHD Bundle Debug: Digital/Hardcopy/Group value: "' . $digital_or_hard . '"' );
-				error_log( 'RHD Bundle Debug: Single Instrument value: "' . $single_instrument . '"' );
+				// Debug removed
 			}
 
 			// Skip Full Set products and Group rows in first pass
 			if ( 'full set' === $single_instrument ) {
-				error_log( 'RHD Bundle Debug: Skipping Full Set product: ' . $row['Product ID'] );
 				continue;
 			}
 			if ( 'group' === $digital_or_hard ) {
-				error_log( 'RHD Bundle Debug: Skipping Group row: ' . $row['Product ID'] );
 				continue;
 			}
 
 			$product_id = wc_get_product_id_by_sku( $row['Product ID'] );
 			if ( !$product_id ) {
-				error_log( 'RHD Bundle Debug: Product not found for SKU: ' . $row['Product ID'] );
 				continue;
 			}
 
@@ -450,11 +448,10 @@ class RHD_CSharp_Bundle_Creator {
 					'hardcopy_data' => null,
 					'base_data'     => $row,
 				];
-				error_log( 'RHD Bundle Debug: Created family for base SKU: ' . $base_sku );
 			}
 			$product_families[$base_sku]['products'][] = $product_id;
 		}
-		error_log( 'RHD Bundle Debug: Found ' . $individual_products_found . ' individual products in ' . count( $product_families ) . ' families' );
+		// Debug removed
 
 		// Second pass: Process Full Set products and Group rows
 		$full_set_found   = 0;
@@ -471,8 +468,7 @@ class RHD_CSharp_Bundle_Creator {
 			// Process Full Set products
 			if ( 'full set' === $single_instrument ) {
 				$full_set_found++;
-				error_log( 'RHD Bundle Debug: Processing Full Set product: ' . $row['Product ID'] . ' (Digital/Hardcopy/Group: "' . $digital_or_hard . '")' );
-				error_log( 'RHD Bundle Debug: Using field "Digital/Hardcopy/Group" with value: "' . ( $row['Digital/Hardcopy/Group'] ?? 'NOT_SET' ) . '"' );
+				// Debug removed
 
 				if ( !isset( $product_families[$base_sku] ) ) {
 					$product_families[$base_sku] = [
@@ -481,23 +477,20 @@ class RHD_CSharp_Bundle_Creator {
 						'hardcopy_data' => null,
 						'base_data'     => $row,
 					];
-					error_log( 'RHD Bundle Debug: Created new family for Full Set base SKU: ' . $base_sku );
+					// Debug removed
 				}
 
 				// Store data based on Digital/Hardcopy/Group type
 				if ( 'digital' === $digital_or_hard ) {
 					$product_families[$base_sku]['full_set_data'] = $row;
-					error_log( 'RHD Bundle Debug: Set full_set_data for ' . $base_sku );
 				} elseif ( in_array( $digital_or_hard, ['hardcopy', 'hardcover'] ) ) {
 					$product_families[$base_sku]['hardcopy_data'] = $row;
-					error_log( 'RHD Bundle Debug: Set hardcopy_data for ' . $base_sku );
 				}
 			}
 
 			// Process Group rows for base data (clean title)
 			if ( 'group' === $digital_or_hard ) {
 				$group_rows_found++;
-				error_log( 'RHD Bundle Debug: Processing Group row: ' . $row['Product ID'] );
 
 				if ( !isset( $product_families[$base_sku] ) ) {
 					$product_families[$base_sku] = [
@@ -506,15 +499,13 @@ class RHD_CSharp_Bundle_Creator {
 						'hardcopy_data' => null,
 						'base_data'     => $row,
 					];
-					error_log( 'RHD Bundle Debug: Created new family for Group base SKU: ' . $base_sku );
 				} else {
 					// Update base_data with Group row data (it has the clean title)
 					$product_families[$base_sku]['base_data'] = $row;
-					error_log( 'RHD Bundle Debug: Updated base_data for ' . $base_sku . ' with Group row' );
 				}
 			}
 		}
-		error_log( 'RHD Bundle Debug: Found ' . $full_set_found . ' Full Set products and ' . $group_rows_found . ' Group rows' );
+		// Debug removed
 
 		// Filter to only return families that have at least digital data or hardcopy data with products
 		$valid_families = [];
@@ -522,15 +513,11 @@ class RHD_CSharp_Bundle_Creator {
 			$has_digital_bundle = $family_data['full_set_data'] && count( $family_data['products'] ) > 0;
 			$has_hardcopy       = $family_data['hardcopy_data'];
 
-			error_log( 'RHD Bundle Debug: Family ' . $base_sku . ' - Digital bundle: ' . ( $has_digital_bundle ? 'yes' : 'no' ) . ', Hardcopy: ' . ( $has_hardcopy ? 'yes' : 'no' ) . ', Products: ' . count( $family_data['products'] ) );
-
 			if ( $has_digital_bundle || $has_hardcopy ) {
 				$valid_families[$base_sku] = $family_data;
-				error_log( 'RHD Bundle Debug: Added valid family: ' . $base_sku );
 			}
 		}
 
-		error_log( 'RHD Bundle Debug: Returning ' . count( $valid_families ) . ' valid families out of ' . count( $product_families ) . ' total families' );
 		return $valid_families;
 	}
 

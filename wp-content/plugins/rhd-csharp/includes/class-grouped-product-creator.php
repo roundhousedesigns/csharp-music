@@ -17,14 +17,10 @@ class RHD_CSharp_Grouped_Product_Creator {
 		$existing_grouped_id = $this->get_existing_grouped_product( $base_sku );
 
 		if ( $existing_grouped_id ) {
-			error_log( 'RHD Import: Updating existing grouped product ID: ' . $existing_grouped_id );
 			return $this->update_existing_grouped_product( $existing_grouped_id, $base_sku, $family_data, $bundle_id );
 		}
 
-		error_log( 'RHD Import: Creating new grouped product for base SKU: ' . $base_sku );
 		$result = $this->create_new_grouped_product( $base_sku, $family_data, $bundle_id );
-
-		error_log( 'RHD Import: New grouped product ID: ' . $result );
 
 		return $result;
 	}
@@ -55,7 +51,6 @@ class RHD_CSharp_Grouped_Product_Creator {
 		
 		if ( $existing_product_id ) {
 			// Convert existing product to grouped product
-			error_log( 'RHD Import: Converting existing product ' . $existing_product_id . ' to grouped product for SKU: ' . $base_sku );
 			$grouped_product = new WC_Product_Grouped( $existing_product_id );
 		} else {
 			// Create new grouped product
@@ -223,45 +218,142 @@ class RHD_CSharp_Grouped_Product_Creator {
 
 		$hardcopy_sku = $hardcopy_data['Product ID'] ?? $base_sku . '-HC';
 
-		// Check if hardcopy product already exists
+		// If a product with this SKU exists, ensure it's a bundle; otherwise convert
 		$existing_id = wc_get_product_id_by_sku( $hardcopy_sku );
+		$bundle      = null;
 		if ( $existing_id ) {
-			return $existing_id;
+			$existing = wc_get_product( $existing_id );
+			if ( $existing && is_a( $existing, 'WC_Product_Bundle' ) ) {
+				$bundle = $existing;
+			} else {
+				// Convert existing product to a bundle
+				$bundle = new WC_Product_Bundle( $existing_id );
+				wp_set_object_terms( $existing_id, 'bundle', 'product_type' );
+			}
+		} else {
+			$bundle = new WC_Product_Bundle();
 		}
 
-		// Create new hardcopy product
-		$product = new WC_Product_Simple();
-		$product->set_name( $hardcopy_data['Product Title'] ?? '' );
-		$product->set_sku( $hardcopy_sku );
-		$product->set_description( wp_kses_post( $hardcopy_data['Description'] ?? '' ) );
-		$product->set_regular_price( floatval( $hardcopy_data['Price'] ?? 0 ) );
-		$product->set_catalog_visibility( 'visible' );
-		$product->set_status( 'publish' );
+		// Name: use clean title (remove suffixes like "- Full Set") similar to digital bundles
+		$bundle_title = $hardcopy_data['Product Title'] ?? '';
+		$bundle_title = preg_replace( '/\s*-\s*Full Set$/i', '', $bundle_title );
 
-		// Set as physical product (not downloadable)
-		$product->set_downloadable( false );
-		$product->set_virtual( false );
+		$bundle->set_name( $bundle_title );
+		$bundle->set_sku( $hardcopy_sku );
+		$bundle->set_description( wp_kses_post( $hardcopy_data['Description'] ?? '' ) );
+		$bundle->set_regular_price( floatval( $hardcopy_data['Price'] ?? 0 ) );
+
+		// Hardcopy bundles are physical products
+		$bundle->set_downloadable( false );
+		$bundle->set_virtual( false );
+
+		$bundle->set_catalog_visibility( 'visible' );
+		$bundle->set_status( 'publish' );
 
 		// Set categories
 		if ( !empty( $hardcopy_data['Category'] ) ) {
-			$this->set_product_categories( $product, $hardcopy_data['Category'] );
+			$this->set_product_categories( $bundle, $hardcopy_data['Category'] );
 		}
 
-		// Set product attributes
-		$this->set_hardcopy_product_attributes( $product, $hardcopy_data );
+		// Attributes (match bundle creator: difficulty, ensemble-type, byline)
+		$attribute_config = [
+			'difficulty'    => $hardcopy_data['Difficulty'] ?? '',
+			'ensemble-type' => $hardcopy_data['Ensemble Type'] ?? '',
+			'byline'        => $hardcopy_data['Byline'] ?? '',
+		];
+		$product_importer = new RHD_CSharp_Product_Importer();
+		$product_importer->set_wc_product_attributes( $bundle, $attribute_config );
 
-		$product_id = $product->save();
+		// Save early to get ID
+		$bundle_id = $bundle->save();
 
-		if ( $product_id ) {
-			// Update meta fields
-			$this->update_hardcopy_meta_fields( $product_id, $hardcopy_data );
+		if ( $bundle_id ) {
+			// Track base SKU and Pods meta similar to digital bundles
+			$bundle->update_meta_data( '_bundle_base_sku', $base_sku );
+			$bundle->save();
 
-			// Import files if file handler is available
+			$pod = pods( 'product', $bundle_id );
+			$pod->save( [
+				'original_url'        => $hardcopy_data['Original URL'] ?? '',
+				'soundcloud_link_1'   => $hardcopy_data['Soundcloud Link'] ?? '',
+				'soundcloud_link_2'   => $hardcopy_data['Soundcloud Link 2'] ?? '',
+				'rhd_csharp_importer' => true,
+			] );
+
+			// Import files (images etc.) for the bundle
 			$file_handler = new RHD_CSharp_File_Handler();
-			$file_handler->import_product_files( wc_get_product( $product_id ), $hardcopy_data, true );
+			$file_handler->import_product_files( $bundle, $hardcopy_data, true );
+
+			// Build bundled items from family products (hardcopy singles)
+			$product_ids = [];
+			if ( isset( $family_data['products'] ) && is_array( $family_data['products'] ) ) {
+				$product_ids = $family_data['products'];
+			} else {
+				// Fallback to all products with SKU starting with base SKU
+				global $wpdb;
+				$like_pattern = $wpdb->esc_like( $base_sku ) . '%';
+				$product_ids  = $wpdb->get_col( $wpdb->prepare(
+					"SELECT post_id FROM {$wpdb->postmeta}
+					WHERE meta_key = '_sku'
+					AND meta_value LIKE %s",
+					$like_pattern
+				) );
+			}
+
+			// Set bundled items
+			$bundled_items = [];
+			$menu_order    = 0;
+			foreach ( $product_ids as $product_id ) {
+				$product = wc_get_product( $product_id );
+				if ( !$product ) {
+					continue;
+				}
+
+				// Filter only hardcopy singles: no -D suffix
+				$single_sku     = $product->get_sku();
+				$sku_is_digital = is_string( $single_sku ) && preg_match( '/-D$/i', $single_sku );
+				if ( $sku_is_digital ) {
+					continue;
+				}
+
+				$bundled_items[] = [
+					'bundle_id'  => $bundle_id,
+					'product_id' => $product_id,
+					'menu_order' => $menu_order,
+					'meta_data'  => [
+						'quantity_min'                          => 1,
+						'quantity_max'                          => 1,
+						'quantity_default'                      => 1,
+						'optional'                              => 'no',
+						'hide_thumbnail'                        => 'no',
+						'discount'                              => '',
+						'override_variations'                   => 'no',
+						'allowed_variations'                    => [],
+						'override_default_variation_attributes' => 'no',
+						'default_variation_attributes'          => [],
+						'single_product_visibility'             => 'visible',
+						'cart_visibility'                       => 'visible',
+						'order_visibility'                      => 'visible',
+						'single_product_price_visibility'       => 'visible',
+						'cart_price_visibility'                 => 'visible',
+						'order_price_visibility'                => 'visible',
+						'priced_individually'                   => 'no',
+						'shipped_individually'                  => 'no',
+					],
+				];
+				$menu_order++;
+			}
+
+			$bundle->set_bundled_data_items( $bundled_items );
+			$bundle->save();
+
+			// Ensure WooCommerce recognizes this as a bundle
+			wp_set_object_terms( $bundle_id, 'bundle', 'product_type' );
+			clean_post_cache( $bundle_id );
+			wc_delete_product_transients( $bundle_id );
 		}
 
-		return $product_id;
+		return $bundle_id;
 	}
 
 	/**

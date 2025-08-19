@@ -20,6 +20,9 @@ class RHD_CSharp_Shortcodes {
 		add_shortcode( 'csharp-product-audio', [$this, 'csharp_product_audio_shortcode'] );
 		add_shortcode( 'csharp-bundle-instrumentation', [$this, 'csharp_bundle_instrumentation'] );
 		add_shortcode( 'csharp-purchase-bundled-items', [$this, 'csharp_purchase_bundled_items'] );
+		add_shortcode( 'csharp-grouped-product-bundle-links', [$this, 'csharp_grouped_product_bundle_links'] );
+		add_shortcode( 'csharp-grouped-product-bundle-name', [$this, 'csharp_grouped_product_bundle_name'] );
+		add_shortcode( 'csharp-single-product-title', [$this, 'csharp_single_product_title'] );
 	}
 
 	/**
@@ -32,7 +35,6 @@ class RHD_CSharp_Shortcodes {
 		$output      = '';
 
 		if ( empty( $audio_files ) ) {
-			error_log( 'no audio files for ' . $product_id );
 			return '';
 		}
 
@@ -78,5 +80,43 @@ class RHD_CSharp_Shortcodes {
 		ob_start();
 		include RHD_CSHARP_PLUGIN_DIR . 'templates/purchase-bundled-items.php';
 		return apply_filters( 'the_content', ob_get_clean() );
+	}
+
+	public function csharp_grouped_product_bundle_links() {
+		global $product;
+
+		if ( !$product || $product->get_type() !== 'grouped' ) {
+			return;
+		}
+
+		$output = '';
+
+		$output .= '<div class="grouped-product-bundle-links">';
+
+		// Get product children
+		$children = $product->get_children();
+
+		foreach ( $children as $child_id ) {
+			$child = wc_get_product( $child_id );
+			$output .= '<a href="' . esc_url( $child->get_permalink() ) . '">' . esc_html( $child->get_name() ) . '</a>';
+		}
+
+		$output .= '</div>';
+
+		return $output;
+	}
+
+	public function csharp_single_product_title( $atts ) {
+		global $product;
+
+		if ( !$product ) {
+			return;
+		}
+
+		$atts = shortcode_atts( [
+			'tag' => 'h1',
+		], $atts );
+
+		return '<' . $atts['tag'] . ' class="wp-block-heading">' . $product->get_title() . '</' . $atts['tag'] . '>';
 	}
 }
