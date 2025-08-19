@@ -16,6 +16,8 @@ class RHD_CSharp_CSV_Parser {
 			while ( ( $row = fgetcsv( $handle, 0, ',' ) ) !== false ) {
 				if ( 0 === $row_count ) {
 					$headers = $row;
+					// Debug: Log the header names
+					error_log( 'RHD CSV Debug: Headers found: ' . print_r( $headers, true ) );
 				} else {
 					if ( count( $headers ) === count( $row ) ) {
 						$data[] = array_combine( $headers, $row );

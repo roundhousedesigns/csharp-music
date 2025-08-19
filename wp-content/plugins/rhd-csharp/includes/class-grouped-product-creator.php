@@ -17,10 +17,16 @@ class RHD_CSharp_Grouped_Product_Creator {
 		$existing_grouped_id = $this->get_existing_grouped_product( $base_sku );
 
 		if ( $existing_grouped_id ) {
+			error_log( 'RHD Import: Updating existing grouped product ID: ' . $existing_grouped_id );
 			return $this->update_existing_grouped_product( $existing_grouped_id, $base_sku, $family_data, $bundle_id );
 		}
 
-		return $this->create_new_grouped_product( $base_sku, $family_data, $bundle_id );
+		error_log( 'RHD Import: Creating new grouped product for base SKU: ' . $base_sku );
+		$result = $this->create_new_grouped_product( $base_sku, $family_data, $bundle_id );
+
+		error_log( 'RHD Import: New grouped product ID: ' . $result );
+
+		return $result;
 	}
 
 	/**
@@ -28,10 +34,13 @@ class RHD_CSharp_Grouped_Product_Creator {
 	 */
 	private function get_existing_grouped_product( $base_sku ) {
 		global $wpdb;
-		return $wpdb->get_var( $wpdb->prepare(
+
+		$result = $wpdb->get_var( $wpdb->prepare(
 			"SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_grouped_base_sku' AND meta_value = %s",
 			$base_sku
 		) );
+
+		return $result ? (int) $result : false;
 	}
 
 	/**
@@ -41,10 +50,20 @@ class RHD_CSharp_Grouped_Product_Creator {
 		// Get the base title from full set data, removing "Full Set" and "Digital"/"Hardcopy"
 		$base_title = $this->get_base_title( $family_data );
 
-		// Create the grouped product
-		$grouped_product = new WC_Product_Grouped();
+		// Check if a product with the base SKU already exists
+		$existing_product_id = wc_get_product_id_by_sku( $base_sku );
+		
+		if ( $existing_product_id ) {
+			// Convert existing product to grouped product
+			error_log( 'RHD Import: Converting existing product ' . $existing_product_id . ' to grouped product for SKU: ' . $base_sku );
+			$grouped_product = new WC_Product_Grouped( $existing_product_id );
+		} else {
+			// Create new grouped product
+			$grouped_product = new WC_Product_Grouped();
+			$grouped_product->set_sku( $base_sku );
+		}
+		
 		$grouped_product->set_name( $base_title );
-		$grouped_product->set_sku( $base_sku );
 		$grouped_product->set_status( 'publish' );
 		$grouped_product->set_catalog_visibility( 'visible' );
 
@@ -76,6 +95,9 @@ class RHD_CSharp_Grouped_Product_Creator {
 		$grouped_id = $grouped_product->save();
 
 		if ( $grouped_id ) {
+			// Ensure the product type is set to grouped
+			wp_set_object_terms( $grouped_id, 'grouped', 'product_type' );
+			
 			// Add custom meta to track this as a grouped product for our base SKU
 			update_post_meta( $grouped_id, '_grouped_base_sku', $base_sku );
 

@@ -9,7 +9,7 @@ A WordPress plugin which adds custom functionality to C. Sharp Music, including 
 - **Grouped Product Creation**: Creates WooCommerce Grouped Products containing Digital and Hardcopy variants
 - **WooCommerce Integration**: Full integration with WooCommerce products, categories, bundles, and grouped products
 - **Product Family Grouping**: Groups related products (e.g., CB-1001-SC, CB-1001-FL1) into bundles and grouped products
-- **Digital/Hardcopy Support**: Handles both digital and hardcopy variants of Full Set products
+- **Digital/Hardcopy/Grouped Support**: Handles both digital and hardcopy variants of Full Set products
 - **Custom Meta Fields**: Imports custom product data like difficulty, instrumentation, etc.
 - **Error Handling**: Comprehensive error reporting during import process
 
@@ -33,7 +33,7 @@ The CSV file should contain the following columns:
 
 - **Product Title**: Name of the product
 - **Product ID**: SKU (e.g., CB-1001, CB-1001-SC, CB-1001-FL1)
-- **Digital or Hardcopy**: Indicates whether the product is Digital or Hardcopy (for Full Set products)
+- **Digital/Hardcopy/Grouped**: Indicates whether the product is Digital/Hardcopy/Grouped (for Full Set products)
 - **Single Instrument**: Type of product/instrument
 - **Product File Name**: File name reference
 - **Price**: Product price

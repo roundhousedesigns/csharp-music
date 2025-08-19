@@ -104,8 +104,11 @@ class RHD_CSharp_Product_Importer {
 						continue;
 					}
 
-					// Skip Full Set products in first pass - they'll be handled as bundles
+					// Skip Full Set products and Group rows in first pass
 					if ( isset( $row['Single Instrument'] ) && strtolower( trim( $row['Single Instrument'] ) ) === 'full set' ) {
+						continue;
+					}
+					if ( isset( $row['Digital/Hardcopy/Group'] ) && strtolower( trim( $row['Digital/Hardcopy/Group'] ) ) === 'group' ) {
 						continue;
 					}
 
@@ -148,18 +151,18 @@ class RHD_CSharp_Product_Importer {
 				}
 			}
 
-			// Second pass: Process Full Set products and store their data by type (Digital/Hardcopy)
+			// Second pass: Process Full Set products and Group rows
 			foreach ( $csv_data as $row ) {
 				$this->tick_execution_time();
 				if ( empty( $row['Product ID'] ) ) {
 					continue;
 				}
 
-				// Only process Full Set products in second pass
-				if ( isset( $row['Single Instrument'] ) && strtolower( trim( $row['Single Instrument'] ) ) === 'full set' ) {
-					$base_sku        = $this->get_base_sku( $row['Product ID'] );
-					$digital_or_hard = strtolower( trim( $row['Digital or Hardcopy'] ?? 'digital' ) );
+				$digital_or_hard = strtolower( trim( $row['Digital/Hardcopy/Group'] ?? '' ) );
+				$base_sku = $this->get_base_sku( $row['Product ID'] );
 
+				// Process Full Set products
+				if ( isset( $row['Single Instrument'] ) && strtolower( trim( $row['Single Instrument'] ) ) === 'full set' ) {
 					if ( !isset( $product_families[$base_sku] ) ) {
 						$product_families[$base_sku] = [
 							'products'       => [],
@@ -169,11 +172,26 @@ class RHD_CSharp_Product_Importer {
 						];
 					}
 
-					// Store data based on Digital or Hardcopy type
+					// Store data based on Digital/Hardcopy/Group type
 					if ( $digital_or_hard === 'digital' ) {
 						$product_families[$base_sku]['full_set_data'] = $row;
-					} elseif ( $digital_or_hard === 'hardcopy' ) {
+					} elseif ( in_array( $digital_or_hard, ['hardcopy', 'hardcover'] ) ) {
 						$product_families[$base_sku]['hardcopy_data'] = $row;
+					}
+				}
+
+				// Process Group rows for base data (clean title)
+				if ( $digital_or_hard === 'group' ) {
+					if ( !isset( $product_families[$base_sku] ) ) {
+						$product_families[$base_sku] = [
+							'products'       => [],
+							'full_set_data'  => null,
+							'hardcopy_data'  => null,
+							'base_data'      => $row,
+						];
+					} else {
+						// Update base_data with Group row data (it has the clean title)
+						$product_families[$base_sku]['base_data'] = $row;
 					}
 				}
 			}
@@ -248,8 +266,11 @@ class RHD_CSharp_Product_Importer {
 					continue;
 				}
 
-				// Skip Full Set products in chunk processing - they'll be handled as bundles
+				// Skip Full Set products and Group rows in chunk processing
 				if ( isset( $row['Single Instrument'] ) && strtolower( trim( $row['Single Instrument'] ) ) === 'full set' ) {
+					continue;
+				}
+				if ( isset( $row['Digital/Hardcopy/Grouped'] ) && strtolower( trim( $row['Digital/Hardcopy/Grouped'] ) ) === 'group' ) {
 					continue;
 				}
 
