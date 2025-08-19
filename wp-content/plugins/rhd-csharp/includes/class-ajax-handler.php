@@ -294,12 +294,14 @@ class RHD_CSharp_Ajax_Handler {
 			// Get chunk of bundle families to process
 			$families_chunk = array_slice( $bundle_families, $offset, $chunk_size, true );
 
-			$bundle_creator = new RHD_CSharp_Bundle_Creator();
+			$bundle_creator          = new RHD_CSharp_Bundle_Creator();
+			$grouped_product_creator = new RHD_CSharp_Grouped_Product_Creator();
 
 			$results = [
-				'bundles_created' => 0,
-				'errors'          => [],
-				'file_not_found'  => [],
+				'bundles_created'          => 0,
+				'grouped_products_created' => 0,
+				'errors'                   => [],
+				'file_not_found'           => [],
 			];
 
 			// Log bundle processing start
@@ -311,21 +313,46 @@ class RHD_CSharp_Ajax_Handler {
 			// Process each family in the chunk
 			foreach ( $families_chunk as $base_sku => $family_data ) {
 				$this->tick_execution_time();
-				try {
-					$file_handler->write_to_log( "Creating bundle for base SKU: {$base_sku}" );
-					$bundle_id = $bundle_creator->create_product_bundle( $base_sku, $family_data, $file_handler );
-					if ( $bundle_id ) {
-						$results['bundles_created']++;
-						// $file_handler->log_import_success( "Successfully created bundle {$bundle_id} for base SKU: {$base_sku}" );
-					} else {
-						$error_msg           = sprintf( __( 'Failed to create bundle for %s', 'rhd' ), $base_sku );
+				$bundle_id = null;
+				
+				// Create digital bundle if we have full set digital data
+				if ( isset( $family_data['full_set_data'] ) && isset( $family_data['products'] ) && count( $family_data['products'] ) > 0 ) {
+					try {
+						$file_handler->write_to_log( "Creating bundle for base SKU: {$base_sku}" );
+						$bundle_id = $bundle_creator->create_product_bundle( $base_sku, $family_data, $file_handler );
+						if ( $bundle_id ) {
+							$results['bundles_created']++;
+							// $file_handler->log_import_success( "Successfully created bundle {$bundle_id} for base SKU: {$base_sku}" );
+						} else {
+							$error_msg           = sprintf( __( 'Failed to create bundle for %s', 'rhd' ), $base_sku );
+							$results['errors'][] = $error_msg;
+							$file_handler->log_import_error( $error_msg, 'Bundle Creation' );
+						}
+					} catch ( Exception $e ) {
+						$error_msg           = sprintf( __( 'Error creating bundle for %s: %s', 'rhd' ), $base_sku, $e->getMessage() );
 						$results['errors'][] = $error_msg;
 						$file_handler->log_import_error( $error_msg, 'Bundle Creation' );
 					}
-				} catch ( Exception $e ) {
-					$error_msg           = sprintf( __( 'Error creating bundle for %s: %s', 'rhd' ), $base_sku, $e->getMessage() );
-					$results['errors'][] = $error_msg;
-					$file_handler->log_import_error( $error_msg, 'Bundle Creation' );
+				}
+
+				// Create grouped product if we have either digital bundle or hardcopy data
+				if ( $bundle_id || ( isset( $family_data['hardcopy_data'] ) && $family_data['hardcopy_data'] ) ) {
+					try {
+						$file_handler->write_to_log( "Creating grouped product for base SKU: {$base_sku}" );
+						$grouped_id = $grouped_product_creator->create_grouped_product( $base_sku, $family_data, $bundle_id );
+						if ( $grouped_id ) {
+							$results['grouped_products_created']++;
+							// $file_handler->log_import_success( "Successfully created grouped product {$grouped_id} for base SKU: {$base_sku}" );
+						} else {
+							$error_msg           = sprintf( __( 'Failed to create grouped product for %s', 'rhd' ), $base_sku );
+							$results['errors'][] = $error_msg;
+							$file_handler->log_import_error( $error_msg, 'Grouped Product Creation' );
+						}
+					} catch ( Exception $e ) {
+						$error_msg           = sprintf( __( 'Error creating grouped product for %s: %s', 'rhd' ), $base_sku, $e->getMessage() );
+						$results['errors'][] = $error_msg;
+						$file_handler->log_import_error( $error_msg, 'Grouped Product Creation' );
+					}
 				}
 			}
 
@@ -351,8 +378,9 @@ class RHD_CSharp_Ajax_Handler {
 			if ( $is_complete ) {
 				unlink( $file_path );
 				$file_handler->log_phase_complete( 'Bundle Creation', [
-					'total_processed' => $processed,
-					'bundles_created' => $results['bundles_created'],
+					'total_processed'          => $processed,
+					'bundles_created'          => $results['bundles_created'],
+					'grouped_products_created' => $results['grouped_products_created'],
 				] );
 
 				// Log final import summary

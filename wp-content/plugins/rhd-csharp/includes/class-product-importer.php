@@ -72,13 +72,15 @@ class RHD_CSharp_Product_Importer {
 	public function import_products_from_csv( $file_path, $update_existing = false ) {
 		$this->prepare_long_running_process();
 		try {
-			$csv_parser     = new RHD_CSharp_CSV_Parser();
-			$bundle_creator = new RHD_CSharp_Bundle_Creator();
+			$csv_parser              = new RHD_CSharp_CSV_Parser();
+			$bundle_creator          = new RHD_CSharp_Bundle_Creator();
+			$grouped_product_creator = new RHD_CSharp_Grouped_Product_Creator();
 
 			$results = [
 				'products_imported'        => 0,
 				'products_updated'         => 0,
 				'bundles_created'          => 0,
+				'grouped_products_created' => 0,
 				'grouped_products_updated' => 0,
 				'errors'                   => [],
 			];
@@ -116,9 +118,10 @@ class RHD_CSharp_Product_Importer {
 						$base_sku = $this->get_base_sku( $row['Product ID'] );
 						if ( !isset( $product_families[$base_sku] ) ) {
 							$product_families[$base_sku] = [
-								'products'      => [],
-								'full_set_data' => null,
-								'base_data'     => $row,
+								'products'       => [],
+								'full_set_data'  => null,
+								'hardcopy_data'  => null,
+								'base_data'      => $row,
 							];
 						}
 						$product_families[$base_sku]['products'][] = $product_id;
@@ -145,7 +148,7 @@ class RHD_CSharp_Product_Importer {
 				}
 			}
 
-			// Second pass: Process Full Set products and create bundles
+			// Second pass: Process Full Set products and store their data by type (Digital/Hardcopy)
 			foreach ( $csv_data as $row ) {
 				$this->tick_execution_time();
 				if ( empty( $row['Product ID'] ) ) {
@@ -154,23 +157,62 @@ class RHD_CSharp_Product_Importer {
 
 				// Only process Full Set products in second pass
 				if ( isset( $row['Single Instrument'] ) && strtolower( trim( $row['Single Instrument'] ) ) === 'full set' ) {
-					$base_sku = $this->get_base_sku( $row['Product ID'] );
+					$base_sku        = $this->get_base_sku( $row['Product ID'] );
+					$digital_or_hard = strtolower( trim( $row['Digital or Hardcopy'] ?? 'digital' ) );
 
-					if ( isset( $product_families[$base_sku] ) ) {
+					if ( !isset( $product_families[$base_sku] ) ) {
+						$product_families[$base_sku] = [
+							'products'       => [],
+							'full_set_data'  => null,
+							'hardcopy_data'  => null,
+							'base_data'      => $row,
+						];
+					}
+
+					// Store data based on Digital or Hardcopy type
+					if ( $digital_or_hard === 'digital' ) {
 						$product_families[$base_sku]['full_set_data'] = $row;
+					} elseif ( $digital_or_hard === 'hardcopy' ) {
+						$product_families[$base_sku]['hardcopy_data'] = $row;
+					}
+				}
+			}
 
-						try {
-							$bundle_id = $bundle_creator->create_product_bundle( $base_sku, $product_families[$base_sku] );
-							if ( $bundle_id ) {
-								$results['bundles_created']++;
-							}
-						} catch ( Exception $e ) {
-							$results['errors'][] = sprintf(
-								__( 'Error creating bundle for %s: %s', 'rhd' ),
-								$base_sku,
-								$e->getMessage()
-							);
+			// Third pass: Create bundles and grouped products
+			foreach ( $product_families as $base_sku => $family_data ) {
+				$this->tick_execution_time();
+				
+				$bundle_id = null;
+				
+				// Create digital bundle if we have full set digital data
+				if ( $family_data['full_set_data'] && count( $family_data['products'] ) > 0 ) {
+					try {
+						$bundle_id = $bundle_creator->create_product_bundle( $base_sku, $family_data );
+						if ( $bundle_id ) {
+							$results['bundles_created']++;
 						}
+					} catch ( Exception $e ) {
+						$results['errors'][] = sprintf(
+							__( 'Error creating bundle for %s: %s', 'rhd' ),
+							$base_sku,
+							$e->getMessage()
+						);
+					}
+				}
+
+				// Create grouped product if we have either digital bundle or hardcopy data
+				if ( $bundle_id || $family_data['hardcopy_data'] ) {
+					try {
+						$grouped_id = $grouped_product_creator->create_grouped_product( $base_sku, $family_data, $bundle_id );
+						if ( $grouped_id ) {
+							$results['grouped_products_created']++;
+						}
+					} catch ( Exception $e ) {
+						$results['errors'][] = sprintf(
+							__( 'Error creating grouped product for %s: %s', 'rhd' ),
+							$base_sku,
+							$e->getMessage()
+						);
 					}
 				}
 			}

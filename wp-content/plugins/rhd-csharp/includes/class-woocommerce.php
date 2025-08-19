@@ -226,12 +226,17 @@ class RHD_CSharp_WooCommerce {
 	public static function get_bundled_products( $product_id ) {
 		$product = wc_get_product( $product_id );
 
+		// Check if this is actually a bundle product
+		if ( !$product || !is_a( $product, 'WC_Product_Bundle' ) ) {
+			return [];
+		}
+
 		// Get bundled items using the proper API
 		$bundled_items     = $product->get_bundled_data_items();
 		$has_bundled_items = !empty( $bundled_items );
 
 		if ( !$has_bundled_items ) {
-			return;
+			return [];
 		}
 
 		// Get individual products for this bundle
@@ -258,7 +263,88 @@ class RHD_CSharp_WooCommerce {
 			}
 		}
 
-		return $individual_products;
+		// Sort products by ensemble type and instrument order
+		return self::sort_products_by_ensemble_order( $individual_products );
+	}
+
+	/**
+	 * Sort products by ensemble type and instrument order
+	 *
+	 * @param  WC_Product[] $products Array of WC_Product objects
+	 * @return WC_Product[] Sorted array of products
+	 */
+	public static function sort_products_by_ensemble_order( $products ) {
+		if ( empty( $products ) ) {
+			return $products;
+		}
+
+		// Define instrument order for each ensemble type
+		$ensemble_orders = [
+			'CONCERT BAND'           => [
+				'Piccolo', 'Flutes', 'Oboe', 'Bassoon', 'Eb Clarinet', 'Clarinets', 'Alto Clarinet',
+				'Bass Clarinet', 'Contralto Clarinet', 'Contrabass Clarinet', 'Alto Saxes', 'Tenor Sax',
+				'Baritone Sax', 'Trumpets', 'French Horns', 'Trombones', 'Baritone/Euphonium',
+				'Baritone/Euphonium TC', 'Tuba', 'Bells', 'Xylophone', 'Vibraphone', 'Marimba',
+				'Percussion', 'Cymbals', 'Snare/Bass Drum', 'Timpani', 'Piano',
+			],
+			'JAZZ ENSEMBLE'          => [
+				'Soprano Sax', 'Alto Sax 1', 'Alto Sax 2', 'Tenor Sax 1', 'Tenor Sax 2', 'Baritone Sax',
+				'Trumpet 1', 'Trumpet 2', 'Trumpet 3', 'Trumpet 4', 'Trombone 1', 'Trombone 2',
+				'Trombone 3', 'Trombone 4 (Bass)', 'Guitar', 'Bass', 'Percussion (Mallets)',
+				'Drums (Drums Set)', 'Piano (Keyboard)',
+			],
+			'JAZZ COMBO'             => [
+				'Alto Sax', 'Tenor Sax', 'Bari Sax', 'Trumpet 1', 'Trumpet 2', 'Trombone', 'Guitar',
+				'Bass Drums', 'Piano', 'Alternate parts',
+			],
+			'PERCUSSION ENSEMBLE'    => [
+				'Bells', 'Xylophones', 'Vibraphones', 'Marimbas', 'Timpani', 'Percussion', 'Cymbals',
+				'Electric Bass', 'Snare Drum', 'Bass Drum', 'Piano',
+			],
+			'BRASS QUINTET (SEXTET)' => [
+				'Trumpet 1', 'Trumpet 2', 'French Horn', 'Trombone', 'Baritone (Euphonium)', 'Tuba',
+				'Percussion (Drums)',
+			],
+			'NEW ORLEANS FAVORITES'  => [
+				'Clarinet', 'Trumpet (Cornet)', 'Trombone', 'Tuba', 'Piano/Banjo', 'Drums', 'Tenor Sax',
+				'Alto Sax',
+			],
+			'CAROLS FOR LOW BRASS'   => [
+				'Part 1', 'Part 2', 'Part 3', 'Part 4', 'Drums', 'Part 1 (TC)', 'Part 2 (TC)',
+				'Part 3 (TC)', 'Part 4 (8va)',
+			],
+		];
+
+		// Determine the ensemble type from the first product
+		$ensemble_type = '';
+		if ( !empty( $products ) ) {
+			$first_product = $products[0];
+			$ensemble_type = $first_product->get_attribute( 'ensemble-type' );
+		}
+
+		// Get the order array for this ensemble type
+		$instrument_order = $ensemble_orders[$ensemble_type] ?? [];
+
+		// If no specific order found, return products as-is
+		if ( empty( $instrument_order ) ) {
+			return $products;
+		}
+
+		// Create a mapping of instrument names to their order index
+		$order_map = array_flip( $instrument_order );
+
+		// Sort products based on instrument order
+		usort( $products, function ( $a, $b ) use ( $order_map ) {
+			$instrument_a = trim( $a->get_attribute( 'instrument' ) );
+			$instrument_b = trim( $b->get_attribute( 'instrument' ) );
+
+			$order_a = isset( $order_map[$instrument_a] ) ? $order_map[$instrument_a] : 999;
+			$order_b = isset( $order_map[$instrument_b] ) ? $order_map[$instrument_b] : 999;
+
+			return $order_a - $order_b;
+		} );
+
+		return $products;
 	}
 
 }

@@ -243,11 +243,12 @@ class RHD_CSharp_Bundle_Creator {
 	}
 
 	/**
-	 * Finalize import by creating bundles for Full Set products
+	 * Finalize import by creating bundles and grouped products for Full Set products
 	 */
 	public function finalize_import( $file_path ) {
-		$csv_parser       = new RHD_CSharp_CSV_Parser();
-		$product_importer = new RHD_CSharp_Product_Importer();
+		$csv_parser              = new RHD_CSharp_CSV_Parser();
+		$product_importer        = new RHD_CSharp_Product_Importer();
+		$grouped_product_creator = new RHD_CSharp_Grouped_Product_Creator();
 
 		// Parse CSV to rebuild product families
 		$csv_data = $csv_parser->parse( $file_path );
@@ -273,15 +274,16 @@ class RHD_CSharp_Bundle_Creator {
 			$base_sku = $this->get_base_sku( $row['Product ID'] );
 			if ( !isset( $product_families[$base_sku] ) ) {
 				$product_families[$base_sku] = [
-					'products'      => [],
-					'full_set_data' => null,
-					'base_data'     => $row,
+					'products'       => [],
+					'full_set_data'  => null,
+					'hardcopy_data'  => null,
+					'base_data'      => $row,
 				];
 			}
 			$product_families[$base_sku]['products'][] = $product_id;
 		}
 
-		// Second pass: Process Full Set products and create bundles
+		// Second pass: Process Full Set products and store their data by type (Digital/Hardcopy)
 		foreach ( $csv_data as $row ) {
 			if ( empty( $row['Product ID'] ) ) {
 				continue;
@@ -289,21 +291,38 @@ class RHD_CSharp_Bundle_Creator {
 
 			// Only process Full Set products in second pass
 			if ( isset( $row['Single Instrument'] ) && strtolower( trim( $row['Single Instrument'] ) ) === 'full set' ) {
-				$base_sku = $this->get_base_sku( $row['Product ID'] );
+				$base_sku        = $this->get_base_sku( $row['Product ID'] );
+				$digital_or_hard = strtolower( trim( $row['Digital or Hardcopy'] ?? 'digital' ) );
 
-				if ( isset( $product_families[$base_sku] ) ) {
+				if ( !isset( $product_families[$base_sku] ) ) {
+					$product_families[$base_sku] = [
+						'products'       => [],
+						'full_set_data'  => null,
+						'hardcopy_data'  => null,
+						'base_data'      => $row,
+					];
+				}
+
+				// Store data based on Digital or Hardcopy type
+				if ( $digital_or_hard === 'digital' ) {
 					$product_families[$base_sku]['full_set_data'] = $row;
+				} elseif ( $digital_or_hard === 'hardcopy' ) {
+					$product_families[$base_sku]['hardcopy_data'] = $row;
 				}
 			}
 		}
 
 		$results = [
-			'bundles_created' => 0,
-			'errors'          => [],
+			'bundles_created'          => 0,
+			'grouped_products_created' => 0,
+			'errors'                   => [],
 		];
 
-		// Create bundles for all families with Full Set data
+		// Create bundles and grouped products for all families
 		foreach ( $product_families as $base_sku => $family_data ) {
+			$bundle_id = null;
+			
+			// Create digital bundle if we have full set digital data
 			if ( $family_data['full_set_data'] && count( $family_data['products'] ) > 0 ) {
 				try {
 					error_log( 'RHD Import: Creating bundle for base SKU: ' . $base_sku );
@@ -335,6 +354,41 @@ class RHD_CSharp_Bundle_Creator {
 					);
 					$results['errors'][] = $error_msg;
 					error_log( 'RHD Import: Fatal error creating bundle for ' . $base_sku . ': ' . $e->getMessage() );
+				}
+			}
+
+			// Create grouped product if we have either digital bundle or hardcopy data
+			if ( $bundle_id || $family_data['hardcopy_data'] ) {
+				try {
+					error_log( 'RHD Import: Creating grouped product for base SKU: ' . $base_sku );
+					$grouped_id = $grouped_product_creator->create_grouped_product( $base_sku, $family_data, $bundle_id );
+					if ( $grouped_id ) {
+						$results['grouped_products_created']++;
+						error_log( 'RHD Import: Successfully created grouped product ' . $grouped_id . ' for base SKU: ' . $base_sku );
+					} else {
+						$error_msg = sprintf(
+							__( 'Failed to create grouped product for %s: Unknown error', 'rhd' ),
+							$base_sku
+						);
+						$results['errors'][] = $error_msg;
+						error_log( 'RHD Import: ' . $error_msg );
+					}
+				} catch ( Exception $e ) {
+					$error_msg = sprintf(
+						__( 'Error creating grouped product for %s: %s', 'rhd' ),
+						$base_sku,
+						$e->getMessage()
+					);
+					$results['errors'][] = $error_msg;
+					error_log( 'RHD Import: Exception creating grouped product for ' . $base_sku . ': ' . $e->getMessage() );
+				} catch ( Error $e ) {
+					$error_msg = sprintf(
+						__( 'Fatal error creating grouped product for %s: %s', 'rhd' ),
+						$base_sku,
+						$e->getMessage()
+					);
+					$results['errors'][] = $error_msg;
+					error_log( 'RHD Import: Fatal error creating grouped product for ' . $base_sku . ': ' . $e->getMessage() );
 				}
 			}
 		}
@@ -372,15 +426,16 @@ class RHD_CSharp_Bundle_Creator {
 			$base_sku = $this->get_base_sku( $row['Product ID'] );
 			if ( !isset( $product_families[$base_sku] ) ) {
 				$product_families[$base_sku] = [
-					'products'      => [],
-					'full_set_data' => null,
-					'base_data'     => $row,
+					'products'       => [],
+					'full_set_data'  => null,
+					'hardcopy_data'  => null,
+					'base_data'      => $row,
 				];
 			}
 			$product_families[$base_sku]['products'][] = $product_id;
 		}
 
-		// Second pass: Process Full Set products and add their data
+		// Second pass: Process Full Set products and store their data by type (Digital/Hardcopy)
 		foreach ( $csv_data as $row ) {
 			if ( empty( $row['Product ID'] ) ) {
 				continue;
@@ -388,18 +443,34 @@ class RHD_CSharp_Bundle_Creator {
 
 			// Only process Full Set products in second pass
 			if ( isset( $row['Single Instrument'] ) && strtolower( trim( $row['Single Instrument'] ) ) === 'full set' ) {
-				$base_sku = $this->get_base_sku( $row['Product ID'] );
+				$base_sku        = $this->get_base_sku( $row['Product ID'] );
+				$digital_or_hard = strtolower( trim( $row['Digital or Hardcopy'] ?? 'digital' ) );
 
-				if ( isset( $product_families[$base_sku] ) ) {
+				if ( !isset( $product_families[$base_sku] ) ) {
+					$product_families[$base_sku] = [
+						'products'       => [],
+						'full_set_data'  => null,
+						'hardcopy_data'  => null,
+						'base_data'      => $row,
+					];
+				}
+
+				// Store data based on Digital or Hardcopy type
+				if ( $digital_or_hard === 'digital' ) {
 					$product_families[$base_sku]['full_set_data'] = $row;
+				} elseif ( $digital_or_hard === 'hardcopy' ) {
+					$product_families[$base_sku]['hardcopy_data'] = $row;
 				}
 			}
 		}
 
-		// Filter to only return families that have Full Set data and products
+		// Filter to only return families that have at least digital data or hardcopy data with products
 		$valid_families = [];
 		foreach ( $product_families as $base_sku => $family_data ) {
-			if ( $family_data['full_set_data'] && count( $family_data['products'] ) > 0 ) {
+			$has_digital_bundle = $family_data['full_set_data'] && count( $family_data['products'] ) > 0;
+			$has_hardcopy = $family_data['hardcopy_data'];
+			
+			if ( $has_digital_bundle || $has_hardcopy ) {
 				$valid_families[$base_sku] = $family_data;
 			}
 		}
