@@ -8,6 +8,7 @@ A WordPress plugin which adds custom functionality to C. Sharp Music, including 
 - **Automatic Product Bundles**: Creates bundles for product families based on SKU prefixes
 - **WooCommerce Integration**: Full integration with WooCommerce products and categories
 - **Product Family Grouping**: Groups related products (e.g., CB-1001-SC, CB-1001-FL1) into bundles
+- **Grouped Products**: Automatically creates a WooCommerce Grouped Product per base SKU that contains the Full Set Digital (bundle) and the Full Set Hardcopy
 - **Custom Meta Fields**: Imports custom product data like difficulty, instrumentation, etc.
 - **Error Handling**: Comprehensive error reporting during import process
 
@@ -31,7 +32,10 @@ The CSV file should contain the following columns:
 
 - **Product Title**: Name of the product
 - **Product ID**: SKU (e.g., CB-1001, CB-1001-SC, CB-1001-FL1)
-- **Single Instrument**: Type of product/instrument
+- **Digital or Hardcopy**: One of `Digital`, `Hardcopy` (or `Hardcover`), or `Group` (base SKU row for grouped product title)
+  - Full Set `Digital` rows are used to create the Product Bundle (Full Set Digital)
+  - Full Set `Hardcopy`/`Hardcover` rows are imported as simple products
+  - `Group` rows (base SKU, e.g. `CB-1001`) are used to create a WooCommerce Grouped Product that groups the Full Set Digital (bundle) and Hardcopy products
 - **Product File Name**: File name reference
 - **Price**: Product price
 - **Original URL**: Source URL
@@ -53,8 +57,9 @@ The CSV file should contain the following columns:
 
 1. **Individual Products**: All products with SKUs are imported as WooCommerce Simple Products
 2. **Product Families**: Products are grouped by base SKU (e.g., CB-1001)
-3. **Bundle Creation**: For each product family, a Product Bundle is created
-4. **Bundle Configuration**: Bundles include all related products as optional items
+3. **Bundle Creation**: For each product family, a Product Bundle is created from the Full Set Digital row
+4. **Grouped Product Creation**: For each base SKU, a Grouped Product is created (using the base `Group` row) that contains the Full Set Digital (bundle) and Full Set Hardcopy products
+5. **Bundle Configuration**: Bundles include all related products as optional items
 
 ### SKU Family Logic
 
