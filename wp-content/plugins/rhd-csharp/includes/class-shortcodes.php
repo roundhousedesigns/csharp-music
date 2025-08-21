@@ -58,7 +58,7 @@ class RHD_CSharp_Shortcodes {
 	public function csharp_bundle_instrumentation() {
 		global $product;
 
-		if ( !$product || !is_a( $product, 'WC_Product_Bundle' ) ) {
+		if ( !$product || ( !is_a( $product, 'WC_Product_Bundle' ) && $product->get_type() !== 'grouped' ) ) {
 			return;
 		}
 

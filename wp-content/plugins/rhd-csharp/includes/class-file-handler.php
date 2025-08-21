@@ -684,22 +684,31 @@ class RHD_CSharp_File_Handler {
 	private function get_attachment_by_filename( $filename ) {
 		global $wpdb;
 
-		// First try the exact filename
+		// Normalize and sanitize
+		$sanitized_filename = sanitize_file_name( $filename );
+		$basename           = pathinfo( $sanitized_filename, PATHINFO_FILENAME );
+		$extension          = strtolower( pathinfo( $sanitized_filename, PATHINFO_EXTENSION ) );
+
+		// 1) Try an exact match for the provided filename (works if file was uploaded without suffix)
 		$attachment_id = $wpdb->get_var( $wpdb->prepare(
 			"SELECT post_id FROM {$wpdb->postmeta}
 			WHERE meta_key = '_wp_attached_file'
-			AND meta_value LIKE %s",
-			'%' . $wpdb->esc_like( $filename )
+			AND meta_value LIKE %s
+			LIMIT 1",
+			'%' . $wpdb->esc_like( $sanitized_filename )
 		) );
 
-		// If not found, try the sanitized version
-		if ( !$attachment_id ) {
-			$sanitized_filename = sanitize_file_name( $filename );
-			$attachment_id      = $wpdb->get_var( $wpdb->prepare(
+		// 2) If not found, try to match doggy.jpg or doggy-2.jpg at the end of the stored path
+		if ( !$attachment_id && $basename && $extension ) {
+			// Match: .../doggy.jpg OR .../doggy-<number>.jpg (end of string)
+			$regex = $basename . '(-[0-9]+)?\\.' . $extension . '$';
+			$attachment_id = $wpdb->get_var( $wpdb->prepare(
 				"SELECT post_id FROM {$wpdb->postmeta}
 				WHERE meta_key = '_wp_attached_file'
-				AND meta_value LIKE %s",
-				'%' . $wpdb->esc_like( $sanitized_filename )
+				AND meta_value REGEXP %s
+				ORDER BY post_id DESC
+				LIMIT 1",
+				$regex
 			) );
 		}
 

@@ -54,6 +54,10 @@ class RHD_CSharp_Bundle_Creator {
 		$bundle->set_name( $bundle_title );
 		$bundle->set_description( wp_kses_post( $bundle_data['Description'] ?? '' ) );
 
+		// Set custom slug for digital bundle (downloadable)
+		$slug_base = sanitize_title( $bundle_title );
+		$bundle->set_slug( $slug_base . '-d' );
+
 		// Update the price from CSV data
 		$bundle_price = floatval( $bundle_data['Price'] ?? 0 );
 		$bundle->set_regular_price( $bundle_price );
@@ -103,6 +107,10 @@ class RHD_CSharp_Bundle_Creator {
 		$bundle->set_name( $bundle_title );
 		$bundle->set_sku( $bundle_data['Product ID'] ?? $base_sku );
 		$bundle->set_description( wp_kses_post( $bundle_data['Description'] ?? '' ) );
+
+		// Set custom slug for digital bundle (downloadable)
+		$slug_base = sanitize_title( $bundle_title );
+		$bundle->set_slug( $slug_base . '-d' );
 
 		// Set the price from CSV data
 		$bundle_price = floatval( $bundle_data['Price'] ?? 0 );

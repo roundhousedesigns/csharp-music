@@ -60,6 +60,9 @@ class RHD_CSharp_WooCommerce {
 
 		// Product titles
 		add_filter( 'woocommerce_product_title', [$this, 'filter_add_to_cart_title'], 10, 2 );
+
+		// Downloads
+		add_filter( 'woocommerce_order_get_downloadable_items', [$this, 'remove_bundled_downloads_from_order_downloads'], 10, 2 );
 	}
 
 	/**
@@ -273,6 +276,171 @@ class RHD_CSharp_WooCommerce {
 	}
 
 	/**
+	 * Get filtered downloadable products for a customer, excluding bundled items that were only purchased as part of a bundle
+	 *
+	 * @param  int|null $customer_id The customer ID, or null for current customer
+	 * @return array   Array of downloadable products
+	 */
+	public static function get_filtered_downloadable_products( $customer_id = null ) {
+		// Get the customer object
+		if ( null === $customer_id ) {
+			$customer = WC()->customer;
+		} else {
+			$customer = new WC_Customer( $customer_id );
+		}
+
+		if ( !$customer ) {
+			return [];
+		}
+
+		// Get all downloadable products for the customer
+		$all_downloads = $customer->get_downloadable_products();
+		
+		if ( empty( $all_downloads ) ) {
+			return [];
+		}
+
+		// Check if WooCommerce Product Bundles is active
+		if ( !class_exists( 'WC_Product_Bundle' ) ) {
+			return $all_downloads;
+		}
+
+		$filtered_downloads = [];
+
+		foreach ( $all_downloads as $download ) {
+			// Get the product ID from the download
+			$product_id = $download['product_id'] ?? 0;
+			if ( !$product_id ) {
+				// Keep downloads without product ID
+				$filtered_downloads[] = $download;
+				continue;
+			}
+
+			// Check if this product is part of a bundle
+			$is_bundled_item = self::is_product_bundled_item( $product_id );
+
+			if ( !$is_bundled_item ) {
+				// Not a bundled item, keep it
+				$filtered_downloads[] = $download;
+				continue;
+			}
+
+			// Check if this bundled item was ordered individually (not as part of a bundle)
+			$ordered_individually = self::was_bundled_item_ordered_individually( $product_id, $customer );
+
+			if ( $ordered_individually ) {
+				// Bundled item was ordered individually, keep it
+				$filtered_downloads[] = $download;
+			}
+			// If bundled item was NOT ordered individually, exclude it (it will be available through the bundle)
+		}
+
+		return $filtered_downloads;
+	}
+
+	/**
+	 * Check if a product is a bundled item in any bundle (static version)
+	 *
+	 * @param  int  $product_id The product ID to check
+	 * @return bool True if the product is a bundled item
+	 */
+	private static function is_product_bundled_item( $product_id ) {
+		global $wpdb;
+
+		// Check if this product exists in any bundle's bundled items
+		// The table name might vary depending on WooCommerce Product Bundles version
+		$table_name = $wpdb->prefix . 'woocommerce_bundled_items';
+
+		// Check if table exists
+		$table_exists = $wpdb->get_var( "SHOW TABLES LIKE '{$table_name}'" );
+		if ( !$table_exists ) {
+			// Fallback: check if product is referenced in any bundle's meta
+			$bundle_id = $wpdb->get_var( $wpdb->prepare(
+				"SELECT post_id FROM {$wpdb->postmeta}
+				WHERE meta_key = '_bundle_data'
+				AND meta_value LIKE %s",
+				'%"product_id";s:' . strlen( $product_id ) . ':"' . $product_id . '"%'
+			) );
+			return !empty( $bundle_id );
+		}
+
+		$bundle_id = $wpdb->get_var( $wpdb->prepare(
+			"SELECT bundle_id FROM {$table_name}
+			WHERE product_id = %d",
+			$product_id
+		) );
+
+		return !empty( $bundle_id );
+	}
+
+	/**
+	 * Check if a bundled item was ordered individually (not as part of a bundle) (static version)
+	 *
+	 * @param  int        $product_id The product ID to check
+	 * @param  WC_Customer $customer   The customer object
+	 * @return bool       True if the bundled item was ordered individually
+	 */
+	private static function was_bundled_item_ordered_individually( $product_id, $customer ) {
+		// Get all orders for the customer
+		$orders = wc_get_orders( [
+			'customer_id' => $customer->get_id(),
+			'status'      => wc_get_is_paid_statuses(),
+			'limit'       => -1,
+		] );
+
+		if ( empty( $orders ) ) {
+			return true; // No orders found, keep to be safe
+		}
+
+		foreach ( $orders as $order ) {
+			// Check if this product was ordered as a standalone line item
+			foreach ( $order->get_items() as $item ) {
+				$item_product_id = $item->get_product_id();
+
+				// If this exact product was ordered as a line item, it was ordered individually
+				if ( $item_product_id === $product_id ) {
+					return true;
+				}
+
+				// Check if this item is a bundle that contains our product
+				$item_product = wc_get_product( $item_product_id );
+				if ( $item_product && is_a( $item_product, 'WC_Product_Bundle' ) ) {
+					$bundled_items = $item_product->get_bundled_data_items();
+					if ( !empty( $bundled_items ) ) {
+						foreach ( $bundled_items as $bundled_item ) {
+							// Handle different possible structures of bundled items
+							$bundled_product_id = 0;
+
+							// Check if it's an object with get_product_id method
+							if ( is_object( $bundled_item ) && method_exists( $bundled_item, 'get_product_id' ) ) {
+								$bundled_product_id = $bundled_item->get_product_id();
+							}
+							// Check if it's an array with product_id key
+							elseif ( is_array( $bundled_item ) && isset( $bundled_item['product_id'] ) ) {
+								$bundled_product_id = $bundled_item['product_id'];
+							}
+							// Check if it's an object with product_id property
+							elseif ( is_object( $bundled_item ) && isset( $bundled_item->product_id ) ) {
+								$bundled_product_id = $bundled_item->product_id;
+							}
+
+							if ( $bundled_product_id === $product_id ) {
+								// This product was ordered as part of a bundle, not individually
+								return false;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// If we get here, the product wasn't found in any order items
+		// This could happen if the download was added manually or through other means
+		// In this case, we'll keep it to be safe
+		return true;
+	}
+
+	/**
 	 * Sort products by ensemble type and instrument order
 	 *
 	 * @param  WC_Product[] $products Array of WC_Product objects
@@ -414,4 +582,50 @@ class RHD_CSharp_WooCommerce {
 
 		return file_exists( $path ) ? $path : $template;
 	}
+
+	public function remove_bundled_downloads_from_order_downloads( $downloads, $that ) {
+		// Check if WooCommerce Product Bundles is active
+		if ( !class_exists( 'WC_Product_Bundle' ) ) {
+			return $downloads;
+		}
+
+		// If no downloads or not an order object, return as-is
+		if ( empty( $downloads ) || !is_a( $that, 'WC_Order' ) ) {
+			return $downloads;
+		}
+
+		$filtered_downloads = [];
+
+		foreach ( $downloads as $download ) {
+			// Get the product ID from the download
+			$product_id = $download['product_id'] ?? 0;
+			if ( !$product_id ) {
+				// Keep downloads without product ID
+				$filtered_downloads[] = $download;
+				continue;
+			}
+
+			// Check if this product is part of a bundle
+			$is_bundled_item = $this->is_product_bundled_item( $product_id );
+
+			if ( !$is_bundled_item ) {
+				// Not a bundled item, keep it
+				$filtered_downloads[] = $download;
+				continue;
+			}
+
+			// Check if this bundled item was ordered individually (not as part of a bundle)
+			$ordered_individually = $this->was_bundled_item_ordered_individually( $product_id, $that );
+
+			if ( $ordered_individually ) {
+				// Bundled item was ordered individually, keep it
+				$filtered_downloads[] = $download;
+			}
+			// If bundled item was NOT ordered individually, exclude it (it will be available through the bundle)
+		}
+
+		return $filtered_downloads;
+	}
+
+
 }

@@ -11,7 +11,22 @@ defined( 'ABSPATH' ) || exit;
 
 global $product;
 
-$individual_products = RHD_CSharp_Woocommerce::get_bundled_products( $product->get_id() );
+$individual_products = [];
+if ( $product->get_type() === 'bundle' ) {
+	$individual_products = RHD_CSharp_Woocommerce::get_bundled_products( $product->get_id() );
+} elseif ( $product->get_type() === 'grouped' ) {
+	$children = $product->get_children();
+	if ( !empty( $children ) ) {
+		foreach ( $children as $child_id ) {
+			$child = wc_get_product( $child_id );
+			if ( !$child->is_downloadable() ) {
+				$individual_products = RHD_CSharp_Woocommerce::get_bundled_products( $child_id );
+				break;
+			}
+		}
+	}
+}
+
 $instruments = array_unique( array_map( function( $product ) {
 	return $product->get_attribute( 'instrument' );
 }, $individual_products ) );

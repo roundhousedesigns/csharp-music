@@ -345,6 +345,19 @@ class RHD_CSharp_Product_Importer {
 			$product->set_regular_price( floatval( $data['Price'] ?? 0 ) );
 			$product->set_catalog_visibility( 'visible' );
 			$product->set_status( 'publish' );
+
+			// Set custom slug for simple products based on digital/hardcopy
+			$digital_or_hard = strtolower( trim( $data['Digital/Hardcopy/Group'] ?? '' ) );
+			if ( 'digital' === $digital_or_hard ) {
+				$suffix = '-d';
+			} elseif ( in_array( $digital_or_hard, ['hardcopy', 'hardcover'], true ) ) {
+				$suffix = '-h';
+			} else {
+				// Fallback: infer from presence of product file name
+				$suffix = ! empty( $data['Product File Name'] ) ? '-d' : '-h';
+			}
+			$slug_base = sanitize_title( $title );
+			$product->set_slug( $slug_base . $suffix );
 		} catch ( Exception $e ) {
 			return false;
 		}

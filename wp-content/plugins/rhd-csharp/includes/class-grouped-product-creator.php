@@ -59,6 +59,9 @@ class RHD_CSharp_Grouped_Product_Creator {
 		}
 		
 		$grouped_product->set_name( $base_title );
+		// Ensure grouped products do not have custom slug suffixes
+		$clean_grouped_slug = sanitize_title( $base_title );
+		$grouped_product->set_slug( $clean_grouped_slug );
 		$grouped_product->set_status( 'publish' );
 		$grouped_product->set_catalog_visibility( 'visible' );
 
@@ -118,6 +121,9 @@ class RHD_CSharp_Grouped_Product_Creator {
 		// Update basic data
 		$base_title = $this->get_base_title( $family_data );
 		$grouped_product->set_name( $base_title );
+		// Ensure grouped products do not have custom slug suffixes
+		$clean_grouped_slug = sanitize_title( $base_title );
+		$grouped_product->set_slug( $clean_grouped_slug );
 
 		// Update description
 		$description = '';
@@ -246,6 +252,10 @@ class RHD_CSharp_Grouped_Product_Creator {
 		// Hardcopy bundles are physical products
 		$bundle->set_downloadable( false );
 		$bundle->set_virtual( false );
+
+		// Set custom slug for hardcopy bundle
+		$slug_base = sanitize_title( $bundle_title );
+		$bundle->set_slug( $slug_base . '-h' );
 
 		$bundle->set_catalog_visibility( 'visible' );
 		$bundle->set_status( 'publish' );
