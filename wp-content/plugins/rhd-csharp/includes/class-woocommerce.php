@@ -63,6 +63,9 @@ class RHD_CSharp_WooCommerce {
 
 		// Downloads
 		add_filter( 'woocommerce_order_get_downloadable_items', [$this, 'remove_bundled_downloads_from_order_downloads'], 10, 2 );
+
+		// Gallery
+		add_filter( 'woocommerce_cart_item_thumbnail', [$this, 'custom_woocommerce_gallery_image_size'], 10, 3 );
 	}
 
 	/**
@@ -279,7 +282,7 @@ class RHD_CSharp_WooCommerce {
 	 * Get filtered downloadable products for a customer, excluding bundled items that were only purchased as part of a bundle
 	 *
 	 * @param  int|null $customer_id The customer ID, or null for current customer
-	 * @return array   Array of downloadable products
+	 * @return array    Array of downloadable products
 	 */
 	public static function get_filtered_downloadable_products( $customer_id = null ) {
 		// Get the customer object
@@ -295,7 +298,7 @@ class RHD_CSharp_WooCommerce {
 
 		// Get all downloadable products for the customer
 		$all_downloads = $customer->get_downloadable_products();
-		
+
 		if ( empty( $all_downloads ) ) {
 			return [];
 		}
@@ -376,9 +379,9 @@ class RHD_CSharp_WooCommerce {
 	/**
 	 * Check if a bundled item was ordered individually (not as part of a bundle) (static version)
 	 *
-	 * @param  int        $product_id The product ID to check
+	 * @param  int         $product_id The product ID to check
 	 * @param  WC_Customer $customer   The customer object
-	 * @return bool       True if the bundled item was ordered individually
+	 * @return bool        True if the bundled item was ordered individually
 	 */
 	private static function was_bundled_item_ordered_individually( $product_id, $customer ) {
 		// Get all orders for the customer
@@ -438,93 +441,6 @@ class RHD_CSharp_WooCommerce {
 		// This could happen if the download was added manually or through other means
 		// In this case, we'll keep it to be safe
 		return true;
-	}
-
-	/**
-	 * Sort products by ensemble type and instrument order
-	 *
-	 * @param  WC_Product[] $products Array of WC_Product objects
-	 * @return WC_Product[] Sorted array of products
-	 */
-	public static function sort_products_by_ensemble_order( $products ) {
-		if ( empty( $products ) ) {
-			return $products;
-		}
-
-		// Define instrument order for each ensemble type
-		$ensemble_orders = [
-			'CONCERT BAND'           => [
-				'Piccolo', 'Flute 1', 'Flute 2', 'Flute 3', 'Oboe', 'Bassoon', 'Eb Clarinet', 'Clarinet 1', 'Clarinet 2', 'Clarinet 3', 'Alto Clarinet',
-				'Bass Clarinet', 'Contralto Clarinet', 'Contrabass Clarinet', 'Alto Sax 1', 'Alto Sax 2', 'Alto Sax 3', 'Tenor Sax',
-				'Baritone Sax', 'Trumpet 1', 'Trumpet 2', 'Trumpet 3', 'French Horn 1', 'French Horn 2', 'French Horn 3', 'Trombone 1', 'Trombone 2', 'Trombone 3', 'Baritone/Euphonium',
-				'Baritone/Euphonium TC', 'Tuba', 'Bells', 'Xylophone', 'Vibraphone', 'Marimba',
-				'Percussion', 'Cymbals', 'Snare/Bass Drum', 'Timpani', 'Piano',
-			],
-			'WIND BAND'              => [
-				'Piccolo', 'Flute 1', 'Flute 2', 'Flute 3', 'Oboe', 'Bassoon', 'Eb Clarinet', 'Clarinet 1', 'Clarinet 2', 'Clarinet 3', 'Alto Clarinet',
-				'Bass Clarinet', 'Contralto Clarinet', 'Contrabass Clarinet', 'Alto Sax 1', 'Alto Sax 2', 'Alto Sax 3', 'Tenor Sax',
-				'Baritone Sax', 'Trumpet 1', 'Trumpet 2', 'Trumpet 3', 'French Horn 1', 'French Horn 2', 'French Horn 3', 'Trombone 1', 'Trombone 2', 'Trombone 3', 'Baritone/Euphonium',
-				'Baritone/Euphonium TC', 'Tuba', 'Bells', 'Xylophone', 'Vibraphone', 'Marimba',
-				'Percussion', 'Cymbals', 'Snare/Bass Drum', 'Timpani', 'Piano',
-			],
-			'JAZZ ENSEMBLE'          => [
-				'Soprano Sax', 'Alto Sax 1', 'Alto Sax 2', 'Tenor Sax 1', 'Tenor Sax 2', 'Baritone Sax',
-				'Trumpet 1', 'Trumpet 2', 'Trumpet 3', 'Trumpet 4', 'Trombone 1', 'Trombone 2',
-				'Trombone 3', 'Trombone 4 (Bass)', 'Guitar', 'Bass', 'Percussion (Mallets)',
-				'Drums (Drums Set)', 'Piano (Keyboard)',
-			],
-			'JAZZ COMBO'             => [
-				'Alto Sax', 'Tenor Sax', 'Bari Sax', 'Trumpet 1', 'Trumpet 2', 'Trombone', 'Guitar',
-				'Bass Drums', 'Piano', 'Alternate parts',
-			],
-			'PERCUSSION ENSEMBLE'    => [
-				'Bells', 'Xylophones', 'Vibraphones', 'Marimbas', 'Timpani', 'Percussion', 'Cymbals',
-				'Electric Bass', 'Snare Drum', 'Bass Drum', 'Piano',
-			],
-			'BRASS QUINTET (SEXTET)' => [
-				'Trumpet 1', 'Trumpet 2', 'French Horn', 'Trombone', 'Baritone (Euphonium)', 'Tuba',
-				'Percussion (Drums)',
-			],
-			'NEW ORLEANS FAVORITES'  => [
-				'Clarinet', 'Trumpet (Cornet)', 'Trombone', 'Tuba', 'Piano/Banjo', 'Drums', 'Tenor Sax',
-				'Alto Sax',
-			],
-			'CAROLS FOR LOW BRASS'   => [
-				'Part 1', 'Part 2', 'Part 3', 'Part 4', 'Drums', 'Part 1 (TC)', 'Part 2 (TC)',
-				'Part 3 (TC)', 'Part 4 (8va)',
-			],
-		];
-
-		// Determine the ensemble type from the first product
-		$ensemble_type = '';
-		if ( !empty( $products ) ) {
-			$first_product = $products[0];
-			$ensemble_type = $first_product->get_attribute( 'ensemble-type' );
-		}
-
-		// Get the order array for this ensemble type
-		$instrument_order = $ensemble_orders[strtoupper( $ensemble_type )] ?? [];
-
-		// If no specific order found, return products as-is
-		if ( empty( $instrument_order ) ) {
-			return $products;
-		}
-
-		// Create a mapping of instrument names to their order index
-		$order_map = array_flip( $instrument_order );
-
-		// Sort products based on instrument order
-		usort( $products, function ( $a, $b ) use ( $order_map ) {
-			$instrument_a = trim( $a->get_attribute( 'instrument' ) );
-			$instrument_b = trim( $b->get_attribute( 'instrument' ) );
-
-			$order_a = isset( $order_map[$instrument_a] ) ? $order_map[$instrument_a] : 999;
-			$order_b = isset( $order_map[$instrument_b] ) ? $order_map[$instrument_b] : 999;
-
-			return $order_a - $order_b;
-		} );
-
-		return array_values( $products );
 	}
 
 	public static function filter_grouped_product_title( $title, $product ) {
@@ -627,5 +543,12 @@ class RHD_CSharp_WooCommerce {
 		return $filtered_downloads;
 	}
 
+	public function custom_woocommerce_gallery_image_size( $thumbnail, $cart_item, $cart_item_key ) {
+		$product = apply_filters( 'woocommerce_cart_item_product', $cart_item['data'], $cart_item, $cart_item_key );
+		$image   = $product->get_image( 'full' );
 
+		error_log( print_r( $image, true ) );
+
+		return $image;
+	}
 }

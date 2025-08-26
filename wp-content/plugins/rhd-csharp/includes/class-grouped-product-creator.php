@@ -102,6 +102,13 @@ class RHD_CSharp_Grouped_Product_Creator {
 			// Update Pods fields
 			$this->update_grouped_meta_fields( $grouped_id, $family_data );
 
+			// Import and associate files (e.g., featured image) for the grouped product
+			$data_for_files = $family_data['full_set_data'] ?? $family_data['hardcopy_data'] ?? $family_data['base_data'] ?? [];
+			if ( !empty( $data_for_files ) ) {
+				$file_handler = new RHD_CSharp_File_Handler();
+				$file_handler->import_product_files( $grouped_product, $data_for_files, true );
+			}
+
 			// Set up the grouped products (digital bundle + hardcopy product)
 			$this->setup_grouped_children( $grouped_id, $base_sku, $family_data, $bundle_id );
 		}
@@ -154,6 +161,13 @@ class RHD_CSharp_Grouped_Product_Creator {
 
 		// Update Pods fields
 		$this->update_grouped_meta_fields( $grouped_id, $family_data );
+
+		// Import and associate files (e.g., featured image) for the grouped product
+		$data_for_files = $family_data['full_set_data'] ?? $family_data['hardcopy_data'] ?? $family_data['base_data'] ?? [];
+		if ( !empty( $data_for_files ) ) {
+			$file_handler = new RHD_CSharp_File_Handler();
+			$file_handler->import_product_files( $grouped_product, $data_for_files, true );
+		}
 
 		// Update grouped children
 		$this->setup_grouped_children( $grouped_id, $base_sku, $family_data, $bundle_id );

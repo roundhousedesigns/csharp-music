@@ -270,7 +270,7 @@ class RHD_CSharp_Product_Importer {
 				if ( isset( $row['Single Instrument'] ) && strtolower( trim( $row['Single Instrument'] ) ) === 'full set' ) {
 					continue;
 				}
-				if ( isset( $row['Digital/Hardcopy/Grouped'] ) && strtolower( trim( $row['Digital/Hardcopy/Grouped'] ) ) === 'group' ) {
+				if ( isset( $row['Digital/Hardcopy/Group'] ) && strtolower( trim( $row['Digital/Hardcopy/Group'] ) ) === 'group' ) {
 					continue;
 				}
 
@@ -346,16 +346,15 @@ class RHD_CSharp_Product_Importer {
 			$product->set_catalog_visibility( 'visible' );
 			$product->set_status( 'publish' );
 
-			// Set custom slug for simple products based on digital/hardcopy
+			// Set download limit to 1 for downloadable products
 			$digital_or_hard = strtolower( trim( $data['Digital/Hardcopy/Group'] ?? '' ) );
-			if ( 'digital' === $digital_or_hard ) {
-				$suffix = '-d';
-			} elseif ( in_array( $digital_or_hard, ['hardcopy', 'hardcover'], true ) ) {
-				$suffix = '-h';
-			} else {
-				// Fallback: infer from presence of product file name
-				$suffix = ! empty( $data['Product File Name'] ) ? '-d' : '-h';
+			if ( 'digital' === $digital_or_hard || !empty( $data['Product File Name'] ) ) {
+				$product->set_downloadable( true );
+				$product->set_download_limit( 1 );
 			}
+
+			// Set custom slug for simple products based on digital/hardcopy
+			$suffix = ! empty( $data['Product File Name'] ) ? '-d' : '-h';
 			$slug_base = sanitize_title( $title );
 			$product->set_slug( $slug_base . $suffix );
 		} catch ( Exception $e ) {

@@ -2,6 +2,13 @@
 	* WooCommerce Styles
 */
 
+/* Header */
+.wp-block-woocommerce-customer-account a {
+	display: block;
+	height: 24px;
+	width: 24px;
+}
+
 .rhd-sheet-music-bundle {
 	margin: 2em 0;
 }
@@ -175,6 +182,11 @@
 	font-size: var(--wp--preset--font-size--small);
 }
 
+.grouped-product-shop-individual-parts {
+	font-size: var(--wp--preset--font-size--x-small);
+	padding: 6px 10px 4px;
+}
+
 /* Cart */
 table.wc-block-cart-items .wc-block-cart-items__row.is-bundled {
 	display: none !important;
@@ -185,5 +197,11 @@ table.wc-block-cart-items .wc-block-cart-items__row.is-bundled {
 } */
 
 .wc-block-order-confirmation-totals .bundled_table_item {
+	display: none;
+}
+
+/* Checkout */
+
+.wp-block-woocommerce-checkout-order-summary-cart-items-block .wc-block-components-product-details__includes {
 	display: none;
 }

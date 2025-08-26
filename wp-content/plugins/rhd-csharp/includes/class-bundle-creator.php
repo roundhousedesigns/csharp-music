@@ -9,17 +9,20 @@ class RHD_CSharp_Bundle_Creator {
 	 *
 	 * @param  string                  $base_sku     The base SKU of the bundle
 	 * @param  array                   $family_data  The family data
-	 * @param  RHD_CSharp_File_Handler $file_handler The file handler
+	 * @param  RHD_CSharp_File_Handler $file_handler The file handFailed to create bundle forler
 	 * @return int|false               The bundle ID or false if the bundle could not be created
 	 */
 	public function create_product_bundle( $base_sku, $family_data, $file_handler = null ) {
 		// Check if WooCommerce Product Bundles is active
 		if ( !class_exists( 'WC_Product_Bundle' ) ) {
+			error_log( "RHD Debug: WooCommerce Product Bundles not active" );
 			return false;
 		}
 
 		// Use full_set_data for bundle creation
 		$bundle_data = $family_data['full_set_data'] ?? $family_data['base_data'];
+		
+		error_log( "RHD Debug: Creating bundle for {$base_sku} - using " . ( $family_data['full_set_data'] ? 'full_set_data' : 'base_data' ) );
 
 		// Check if bundle already exists
 		global $wpdb;
@@ -65,6 +68,7 @@ class RHD_CSharp_Bundle_Creator {
 		// Mark bundle as downloadable
 		$bundle->set_downloadable( true );
 		$bundle->set_virtual( true );
+		$bundle->set_download_limit( 1 ); // Set download limit to 1 for bundles
 
 		// Set categories
 		if ( !empty( $bundle_data['Category'] ) ) {
@@ -119,6 +123,7 @@ class RHD_CSharp_Bundle_Creator {
 		// Mark bundle as downloadable
 		$bundle->set_downloadable( true );
 		$bundle->set_virtual( true );
+		$bundle->set_download_limit( 1 ); // Set download limit to 1 for bundles
 
 		$bundle->set_catalog_visibility( 'visible' );
 		$bundle->set_status( 'publish' );
@@ -343,18 +348,24 @@ class RHD_CSharp_Bundle_Creator {
 		foreach ( $product_families as $base_sku => $family_data ) {
 			$bundle_id = null;
 
+			// Debug: Log what we're checking for each family
+			error_log( "RHD Debug: Processing family {$base_sku} - full_set_data: " . ( $family_data['full_set_data'] ? 'YES' : 'NO' ) . ", products count: " . count( $family_data['products'] ) );
+
 			// Create digital bundle if we have full set digital data
 			if ( $family_data['full_set_data'] && count( $family_data['products'] ) > 0 ) {
+				error_log( "RHD Debug: Attempting to create digital bundle for {$base_sku}" );
 				try {
 					$bundle_id = $this->create_product_bundle( $base_sku, $family_data );
 					if ( $bundle_id ) {
 						$results['bundles_created']++;
+						error_log( "RHD Debug: Successfully created bundle {$bundle_id} for {$base_sku}" );
 					} else {
 						$error_msg = sprintf(
 							__( 'Failed to create bundle for %s: Unknown error', 'rhd' ),
 							$base_sku
 						);
 						$results['errors'][] = $error_msg;
+						error_log( "RHD Debug: Failed to create bundle for {$base_sku} - returned false" );
 					}
 				} catch ( Exception $e ) {
 					$error_msg = sprintf(
@@ -363,6 +374,7 @@ class RHD_CSharp_Bundle_Creator {
 						$e->getMessage()
 					);
 					$results['errors'][] = $error_msg;
+					error_log( "RHD Debug: Exception creating bundle for {$base_sku}: " . $e->getMessage() );
 				} catch ( Error $e ) {
 					$error_msg = sprintf(
 						__( 'Fatal error creating bundle for %s: %s', 'rhd' ),
@@ -370,7 +382,10 @@ class RHD_CSharp_Bundle_Creator {
 						$e->getMessage()
 					);
 					$results['errors'][] = $error_msg;
+					error_log( "RHD Debug: Fatal error creating bundle for {$base_sku}: " . $e->getMessage() );
 				}
+			} else {
+				error_log( "RHD Debug: Skipping bundle creation for {$base_sku} - missing full_set_data or products" );
 			}
 
 			// Create grouped product if we have either digital bundle or hardcopy data
@@ -521,8 +536,14 @@ class RHD_CSharp_Bundle_Creator {
 			$has_digital_bundle = $family_data['full_set_data'] && count( $family_data['products'] ) > 0;
 			$has_hardcopy       = $family_data['hardcopy_data'];
 
+			// Debug: Log family validation for troubleshooting
+			error_log( "RHD Debug: Family {$base_sku} - full_set_data: " . ( $family_data['full_set_data'] ? 'YES' : 'NO' ) . ", products count: " . count( $family_data['products'] ) . ", hardcopy_data: " . ( $family_data['hardcopy_data'] ? 'YES' : 'NO' ) );
+
 			if ( $has_digital_bundle || $has_hardcopy ) {
 				$valid_families[$base_sku] = $family_data;
+				error_log( "RHD Debug: Family {$base_sku} is VALID" );
+			} else {
+				error_log( "RHD Debug: Family {$base_sku} is INVALID" );
 			}
 		}
 

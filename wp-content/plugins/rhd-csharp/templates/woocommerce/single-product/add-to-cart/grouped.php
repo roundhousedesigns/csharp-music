@@ -102,10 +102,12 @@ do_action( 'woocommerce_before_add_to_cart_form' ); ?>
 							$value = ob_get_clean();
 							break;
 						case 'label':
-							$title = RHD_CSharp_WooCommerce::filter_grouped_product_title( $grouped_product_child->get_name(), $grouped_product_child );
+							$title     = RHD_CSharp_WooCommerce::filter_grouped_product_title( $grouped_product_child->get_name(), $grouped_product_child );
+							$permalink = apply_filters( 'woocommerce_grouped_product_list_link', $grouped_product_child->get_permalink(), $grouped_product_child->get_id() );
 							$value  = '<label for="product-' . esc_attr( $grouped_product_child->get_id() ) . '">';
-							$value .= $grouped_product_child->is_visible() ? '<a href="' . esc_url( apply_filters( 'woocommerce_grouped_product_list_link', $grouped_product_child->get_permalink(), $grouped_product_child->get_id() ) ) . '">' . $title . '</a>' : $title;
+							$value .= $grouped_product_child->is_visible() ? '<a href="' . esc_url( $permalink ) . '">' . $title . '</a>' : $title;
 							$value .= '</label>';
+							$value .= '<br />' . '<a href="' . esc_url( $permalink ) . '" class="wp-block-button__link grouped-product-shop-individual-parts">' . esc_html__( 'Shop Individual Parts', 'woocommerce' ) . '</a>';
 							break;
 						case 'price':
 							$value = $grouped_product_child->get_price_html() . wc_get_stock_html( $grouped_product_child );
