@@ -43,7 +43,7 @@ class RHD_CSharp_Shortcodes {
 		foreach ( $audio_files as $attachment ) {
 			$attachment_url = wp_get_attachment_url( $attachment['ID'] );
 			$output .= '<div class="audio-sample">
-				<audio src="' . esc_url( $attachment_url ) . '" controls></audio>
+				<audio src="' . esc_url( $attachment_url ) . '" controls controlsList="nodownload"></audio>
 			</div>';
 		}
 
