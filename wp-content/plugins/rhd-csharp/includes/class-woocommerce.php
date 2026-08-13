@@ -62,10 +62,13 @@ class RHD_CSharp_WooCommerce {
 		add_filter( 'woocommerce_product_title', [$this, 'filter_add_to_cart_title'], 10, 2 );
 
 		// Downloads
-		add_filter( 'woocommerce_order_get_downloadable_items', [$this, 'remove_bundled_downloads_from_order_downloads'], 10, 2 );
+		// add_filter( 'woocommerce_order_get_downloadable_items', [$this, 'remove_bundled_downloads_from_order_downloads'], 10, 2 );
 
 		// Gallery
 		add_filter( 'woocommerce_cart_item_thumbnail', [$this, 'custom_woocommerce_gallery_image_size'], 10, 3 );
+
+		// Product Filters: show all checkbox options (no "Show X more" truncation).
+		add_filter( 'render_block_woocommerce/product-filter-checkbox-list', [$this, 'expand_product_filter_checkbox_list'], 10, 2 );
 	}
 
 	/**
@@ -547,8 +550,63 @@ class RHD_CSharp_WooCommerce {
 		$product = apply_filters( 'woocommerce_cart_item_product', $cart_item['data'], $cart_item, $cart_item_key );
 		$image   = $product->get_image( 'full' );
 
-		error_log( print_r( $image, true ) );
+		//error_log( print_r( $image, true ) );
 
 		return $image;
 	}
+
+	/**
+	 * Expand WooCommerce Product Filter checkbox lists so all options are visible.
+	 *
+	 * WooCommerce Blocks hardcodes a display limit of 15 (ProductFilterCheckboxList::DISPLAY_LIMIT)
+	 * and renders a "Show X more" control for the overflow. Ensemble Type has more than 15 terms,
+	 * so we mark the list expanded, raise the client display limit, and strip the show-more UI.
+	 *
+	 * @param  string $block_content Rendered block HTML.
+	 * @param  array  $block         Parsed block.
+	 * @return string
+	 */
+	public function expand_product_filter_checkbox_list( $block_content, $block ) {
+		if ( ! is_string( $block_content ) || '' === $block_content ) {
+			return $block_content;
+		}
+
+		$processor = new WP_HTML_Tag_Processor( $block_content );
+
+		if ( ! $processor->next_tag( [
+			'class_name' => 'wc-block-product-filter-checkbox-list',
+		] ) ) {
+			return $block_content;
+		}
+
+		$context_raw = $processor->get_attribute( 'data-wp-context' );
+		if ( ! is_string( $context_raw ) || '' === $context_raw ) {
+			return $block_content;
+		}
+
+		$context = json_decode( $context_raw, true );
+		if ( ! is_array( $context ) ) {
+			return $block_content;
+		}
+
+		$context['isExpanded']   = true;
+		$context['displayLimit'] = 9999;
+
+		$processor->set_attribute(
+			'data-wp-context',
+			wp_json_encode( $context, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP )
+		);
+
+		$updated = $processor->get_updated_html();
+
+		$updated = preg_replace(
+			'#<div class="wc-block-product-filter-checkbox-list__show-more">.*?</div>#s',
+			'',
+			$updated,
+			1
+		);
+
+		return is_string( $updated ) ? $updated : $block_content;
+	}
 }
+

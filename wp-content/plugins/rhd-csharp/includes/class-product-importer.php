@@ -350,6 +350,7 @@ class RHD_CSharp_Product_Importer {
 			$digital_or_hard = strtolower( trim( $data['Digital/Hardcopy/Group'] ?? '' ) );
 			if ( 'digital' === $digital_or_hard || !empty( $data['Product File Name'] ) ) {
 				$product->set_downloadable( true );
+				$product->set_virtual( true );
 				$product->set_download_limit( 1 );
 			}
 

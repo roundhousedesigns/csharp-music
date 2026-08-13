@@ -23,6 +23,9 @@ class RHD_CSharp_Shortcodes {
 		add_shortcode( 'csharp-grouped-product-bundle-links', [$this, 'csharp_grouped_product_bundle_links'] );
 		add_shortcode( 'csharp-grouped-product-bundle-name', [$this, 'csharp_grouped_product_bundle_name'] );
 		add_shortcode( 'csharp-single-product-title', [$this, 'csharp_single_product_title'] );
+
+		// TODO implement bundled items filter for downloads
+		add_shortcode( 'csharp-bundled-items-filter-downloads', [$this, 'csharp_downloads_without_bundled_items'] );
 	}
 
 	/**
@@ -118,5 +121,26 @@ class RHD_CSharp_Shortcodes {
 		], $atts );
 
 		return '<' . $atts['tag'] . ' class="wp-block-heading">' . $product->get_title() . '</' . $atts['tag'] . '>';
+	}
+
+	/**
+	 * Shortcode for filtering out bundled items from download lists
+	 */
+	public function csharp_downloads_without_bundled_items() {
+		global $wp;
+
+		$order_id = absint( $wp->query_vars['order-received'] );
+
+		if ( $order_id ) {
+			$order = wc_get_order( $order_id );
+			$items = $order->get_items();
+
+			foreach ( $items as $item ) {
+				$type = $item->get_name();
+				error_log( $type );
+			}
+		}
+
+		return '';
 	}
 }

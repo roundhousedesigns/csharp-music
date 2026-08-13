@@ -107,7 +107,7 @@ do_action( 'woocommerce_before_add_to_cart_form' ); ?>
 							$value  = '<label for="product-' . esc_attr( $grouped_product_child->get_id() ) . '">';
 							$value .= $grouped_product_child->is_visible() ? '<a href="' . esc_url( $permalink ) . '">' . $title . '</a>' : $title;
 							$value .= '</label>';
-							$value .= '<br />' . '<a href="' . esc_url( $permalink ) . '" class="wp-block-button__link grouped-product-shop-individual-parts">' . esc_html__( 'Shop Individual Parts', 'woocommerce' ) . '</a>';
+							$value .= '<br />' . '<a href="' . esc_url( $permalink ) . '" class="wp-block-button__link grouped-product-shop-individual-parts">' . esc_html__( 'Individual Parts and Scores', ' woocommerce' ) . '</a>';
 							break;
 						case 'price':
 							$value = $grouped_product_child->get_price_html() . wc_get_stock_html( $grouped_product_child );
